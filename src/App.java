@@ -2,23 +2,28 @@ import java.io.*;
 import java.util.*;
 
 public class App {
+    // milliseconds for a beat
+    // int BEAT = 60000 / TEMPO;
+
+    private static final float CROTCHET = 1 / 4.0f;          // quarter note
+    private static final float SEMIQUAVER = CROTCHET / 4.0f; // sixteenth note
+    private static final float QUAVER = CROTCHET / 2.0f;     // eighth note
+    private static final float MINIM = 2 * CROTCHET;         // half note
+    private static final float SEMIBREVE = 4 * CROTCHET;     // whole note
+    private static final float BREVE = 8 * CROTCHET;         // double note
+    private static final float LONGA = 16 * CROTCHET;        // quadruple note
+
+    private static final float TRIPLET = 1 / 3.0f;    // triplet
+    private static final float QUINTUPLET = 1 / 5.0f; // quintuplet
+    private static final float SEXTUPLET = 1 / 6.0f;  // sextuplet
+    private static final float SEPTUPLET = 1 / 7.0f;  // septuplet
+
     public static void main(String[] args) throws Exception {
-        // milliseconds for a beat
-        // int BEAT = 60000 / TEMPO;
+        test2();
+        test3();
+    }
 
-        float CROTCHET = 1 / 4.0f;          // quarter note
-        float SEMIQUAVER = CROTCHET / 4.0f; // sixteenth note
-        float QUAVER = CROTCHET / 2.0f;     // eighth note
-        float MINIM = 2 * CROTCHET;         // half note
-        float SEMIBREVE = 4 * CROTCHET;     // whole note
-        float BREVE = 8 * CROTCHET;         // double note
-        float LONGA = 16 * CROTCHET;        // quadruple note
-
-        float TRIPLET = 1 / 3.0f;    // triplet
-        float QUINTUPLET = 1 / 5.0f; // quintuplet
-        float SEXTUPLET = 1 / 6.0f;  // sextuplet
-        float SEPTUPLET = 1 / 7.0f;  // septuplet
-
+    private static void test2() {
         // Create notes for the melody
         float totalTime = 0;
         LinkedList<Note> melodyNotes = new LinkedList<Note>();
@@ -456,7 +461,11 @@ public class App {
         musicString += " " + bass.toString();
         musicString += " " + percussion.toString();
 
-        // Write file for Test 3
+        // Convert music string to MIDI
+        TestWithAPI.main(new String[] { musicString });
+    }
+
+    private static void test3() {
         float time = 0;
         LinkedList<Note> testNotes = new LinkedList<Note>();
 
@@ -605,7 +614,6 @@ public class App {
         time += QUAVER;
         testNotes.add(new Note(time, 39 + 12, CROTCHET + QUAVER));
         time += CROTCHET + QUAVER;
-
         testNotes.add(new Note(time, 33 + 12, MINIM));
         testNotes.add(new Note(time, 45 + 12, MINIM));
         time += MINIM;
@@ -637,7 +645,6 @@ public class App {
         time += CROTCHET;
         testNotes.add(new Note(time, 40 + 12, CROTCHET + QUAVER));
         time += CROTCHET + QUAVER;
-
         testNotes.add(new Note(time, 40 + 12, CROTCHET));
         time += CROTCHET;
         testNotes.add(new Note(time, 33 + 12, QUAVER));
@@ -666,8 +673,5 @@ public class App {
         } catch (IOException e) {
             System.out.println("Error writing file");
         }
-
-        // Convert music string to MIDI
-        TestWithAPI.main(new String[] { musicString });
     }
 }
