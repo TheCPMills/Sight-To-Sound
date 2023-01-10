@@ -1,3 +1,4 @@
+package music;
 import java.util.*;
 import java.util.stream.*;
 
@@ -36,7 +37,7 @@ public class Chord {
         put("sus2", new int[]{0, 2, 7});
         put("sus4", new int[]{0, 5, 7});
 
-        put("5", new int[]{0, 7});
+        put("5", new int[]{0, 7, 12});
     }};
 
     private final int[] intervals = {0, 2, 4, 5, 7, 9, 11, 12, 14, 16, 17, 19, 21};
