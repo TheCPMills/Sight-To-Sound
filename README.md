@@ -1,2 +1,3 @@
-# Sight-To-Sound
-Currently just prototypes and testing with the JFugue API.
+## Translating Emotions From Sight to Sound
+# Alpha Release - V2.0.1
+Currently functions purely randomly.
