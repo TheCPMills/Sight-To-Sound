@@ -393,20 +393,14 @@ public class Song {
             melodyPitches.add(lastPitch);
         }
 
-        // generate melody notes
-        LinkedList<Note> melodyNotes = new LinkedList<Note>();
-        float melodyTime = 0;
+        // generate melody
+        Voice melody = new Voice(0, melodicTimbre, tempo.getBPM());
         for (int i = 0; i < noteDurations.size(); i++) {
             float duration = noteDurations.get(i).getDuration();
             int pitch = melodyPitches.get(i);
-            Note note = new Note(melodyTime, pitch, duration);
-            melodyNotes.add(note);
-            melodyTime += duration;
+            Note note = new Note(pitch, duration);
+            melody.addNote(note);
         }
-
-        // generate melody
-        Voice melody = new Voice(melodyNotes, 0, melodicTimbre);
-
         // generate harmony rhythm
         LinkedList<NoteDuration> harmonyDurations = new LinkedList<>(Arrays.asList(NoteDuration.SEMIBREVE));
 
@@ -414,41 +408,54 @@ public class Song {
         LinkedList<Integer> harmonyTonics = new LinkedList<>(Arrays.asList(melodyPitches.get(0)));
         LinkedList<String> harmonyChords = new LinkedList<>(Arrays.asList("maj"));
 
-        // generate harmony notes
-        LinkedList<Note> harmonyNotes = new LinkedList<>();
-        float harmonyTime = 0;
+        // generate harmony
+        Voice harmony = new Voice(1, harmonicTimbre, tempo.getBPM());
         for (int i = 0; i < harmonyDurations.size(); i++) {
             float duration = harmonyDurations.get(i).getDuration();
             int tonic = harmonyTonics.get(i);
             String chordType = harmonyChords.get(i);
-            Chord chord = new Chord(harmonyTime, tonic, chordType, duration);
-            harmonyNotes.addAll(new LinkedList<>(Arrays.asList(chord.getNotes())));
-            harmonyTime += duration;
+            Chord chord = new Chord(tonic, chordType, duration);
+            harmony.addChord(chord);
         }
 
-        // generate harmony
-        Voice harmony = new Voice(harmonyNotes, 1, harmonicTimbre);
+        // generate percussion rhythms
+        LinkedList<String> percussionDurations0 = new LinkedList<>() {
+            {
+                add("R_CROTCHET");
+                add("R_CROTCHET");
+                add("QUAVER");
+                add("QUAVER");
+                add("CROTCHET");
+            }
+        };
 
-        // generate percussion rhythm
-        LinkedList<NoteDuration> percussionDurations = new LinkedList<>(Arrays.asList(NoteDuration.CROTCHET, NoteDuration.CROTCHET, NoteDuration.CROTCHET, NoteDuration.CROTCHET));
+        LinkedList<String> percussionDurations1 = new LinkedList<>() {
+            {
+                add("QUAVER_TRIPLET");
+                add("QUAVER_TRIPLET");
+                add("QUAVER_TRIPLET");
+                add("QUAVER");
+                add("QUAVER");
+            }
+        };
 
-        // generate percussion pitches
-        LinkedList<Integer> percussionPitches = new LinkedList<>(Arrays.asList(percussiveTimbres[0], percussiveTimbres[0], percussiveTimbres[0], percussiveTimbres[0]));
+        // generate percussion layers
+        PercussiveLayer percussiveLayer0 = new PercussiveLayer(percussiveTimbres[0]);
+        PercussiveLayer percussiveLayer1 = new PercussiveLayer(percussiveTimbres[1]);
 
         // generate percussion notes
-        LinkedList<PercussiveNote> percussionNotes = new LinkedList<>();
-        float percussionTime = 0;
-        for (int i = 0; i < percussionDurations.size(); i++) {
-            float duration = percussionDurations.get(i).getDuration();
-            int pitch = percussionPitches.get(i);
-            PercussiveNote note = new PercussiveNote(percussionTime, pitch, duration);
-            percussionNotes.add(note);
-            percussionTime += duration;
+        for (int i = 0; i < percussionDurations0.size(); i++) {
+            percussiveLayer0.addNote(percussionDurations0.get(i));
+        }
+
+        for (int i = 0; i < percussionDurations1.size(); i++) {
+            percussiveLayer1.addNote(percussionDurations1.get(i));
         }
 
         // generate percussion
         PercussiveVoice percussion = PercussiveVoice.getInstance();
-        percussion.addNotes(percussionNotes);
+        percussion.addLayer(percussiveLayer0);
+        percussion.addLayer(percussiveLayer1);
 
         // generate measure
         Measure measure = new Measure(melody, harmony);

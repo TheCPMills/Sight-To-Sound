@@ -1,9 +1,9 @@
 {
     "classical": {
         "instruments": [
-            41,
-            7,
-            75
+            11,
+            15,
+            76, 62
         ],
         "rhythmWeights": {
             "W": {

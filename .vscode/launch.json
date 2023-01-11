@@ -2,18 +2,11 @@
     "configurations": [
         {
             "type": "java",
-            "name": "Launch Test",
-            "request": "launch",
-            "mainClass": "Test",
-            "projectName": "SightToSound_baf455ea"
-        },
-        {
-            "type": "java",
             "name": "Launch App",
             "request": "launch",
             "mainClass": "App",
             "vmArgs": "--module-path C:/Users/cpmil//javafx-sdk-17.0.2/lib --add-modules javafx.controls,javafx.fxml",
-            "projectName": "SightToSound_baf455ea"
+            "projectName": "Sight-To-Sound_55e57162"
         }
     ]
 }

@@ -3,7 +3,6 @@ import java.util.*;
 import java.util.stream.*;
 
 public class Chord {
-    private final float time;
     private final int tonic;
     private Note[] notes;
 
@@ -48,8 +47,7 @@ public class Chord {
      * "〈chord type〉 add〈added note〉... no〈omitted note〉... b〈flatted note〉... ＃〈sharpened note〉... (^〈inversion number〉or /〈bass note〉)"
      * <p>
      */
-    public Chord(float time, int tonic, String chord, float duration) {
-        this.time = time;
+    public Chord(int tonic, String chord, float duration) {
         this.tonic = tonic;
         parseChord(chord, duration);
     }
@@ -102,7 +100,7 @@ public class Chord {
 
         this.notes = new Note[noteValues.size()];
         for (int i = 0; i < noteValues.size(); i++) {
-            notes[i] = new Note(time, tonic + noteValues.get(i), duration);
+            notes[i] = new Note(tonic + noteValues.get(i), duration);
         }
     }
 

@@ -15,11 +15,11 @@ public class Measure {
         String measure = "";
 
         if (melody != null) {
-            measure += melody.toString();
+            measure += melody.toString() + " ";
         }
 
         if (harmony != null) {
-            measure += harmony.toString();
+            measure += harmony.toString() + " ";
         }
 
         if (percussion != null) {

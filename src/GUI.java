@@ -1,8 +1,4 @@
-// import org.jfugue.pattern.Atom;
-// import org.jfugue.pattern.Pattern;
-import org.jfugue.player.Player;
-// import org.jfugue.realtime.RealtimePlayer;
-// import org.jfugue.theory.Note;
+import org.jfugue.realtime.RealtimePlayer;
 
 import javafx.application.*;
 // import javafx.fxml.*;
@@ -78,7 +74,7 @@ public class GUI extends Application {
         }
 
         // setup player
-        Player realTimePlayer = new Player();
+        RealtimePlayer player = new RealtimePlayer();
 
         // get BPM
         int bpm = song.getBPM();
@@ -96,16 +92,16 @@ public class GUI extends Application {
 
                 if (MathOps.inBounds(x, y, 0, 0, image.getWidth(), image.getHeight())) {
                     String currentMeasure = song.getMeasure(x, y);
-                    realTimePlayer.play("T" + bpm + " " + currentMeasure);
+                    player.play("T" + bpm + " " + currentMeasure);
 
-                    // System.out.println(currentMeasure);
+                    // NOTE: chords MUST be in same voice but different layers
+                    // NOTE: I know, CRAZY! I thought layers only worked for channel 9.
 
-                    if (realTimePlayer.getManagedPlayer().isPlaying()) {
-                        System.out.println("Playing...");
-                    }
+                    // Percussion Testing
+                    // player.play("T120 @0 &V9,L0,I0,35q @500 &V9,L0,I0,40q @1000 &V9,L0,I0,35q @1500 &V9,L0,I0,40q @0 &V9,L1,I0,42i @250 &V9,L1,I0,42i @500 &V9,L1,I0,42i @750 &V9,L1,I0,42i @1000 &V9,L1,I0,42i @1250 &V9,L1,I0,42i @1500 &V9,L1,I0,42i @1750 &V9,L1,I0,42i");
                 }
             }
-        }, 0, 240000 / bpm - 500);
+        }, 0, 240000 / bpm);
     }
 
     public static void main(String[] args) {
