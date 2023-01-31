@@ -318,7 +318,9 @@ public class App extends Application {
         root.getChildren().add(songDurationTextM2I);
         root.getChildren().add(submitButtonM2I);
 
-        return new Scene(root);
+        Scene scene = new Scene(root);
+        scene.getStylesheets().add(App.class.getResource("color.css").toExternalForm());
+        return scene;
     }
 
     private static Scene createImage2MusicTutorialScene(AnchorPane root) {
@@ -434,6 +436,7 @@ public class App extends Application {
         playButtonI2M.setOnAction(e -> {
             playButtonI2M.setText("Playing...");
             playButtonI2M.setDisable(true);
+            submitButtonI2M.setDisable(true);
             timbreClassKnobI2M.setDisable(true);
             modeKnobI2M.setDisable(true);
             volumeKnobI2M.setDisable(true);
@@ -452,6 +455,7 @@ public class App extends Application {
                         Platform.runLater(() -> {
                             playButtonI2M.setText("Play");
                             playButtonI2M.setDisable(false);
+                            submitButtonI2M.setDisable(false);
                             timbreClassKnobI2M.setDisable(false);
                             modeKnobI2M.setDisable(false);
                             volumeKnobI2M.setDisable(false);
