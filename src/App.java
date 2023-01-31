@@ -31,7 +31,7 @@ import org.json.simple.parser.*;
 
 public class App extends Application {
     /* Main Application Components */
-    private static Stage currentStage;
+    private static Stage primaryStage;
     private static Scene prologueScene, music2ImageTutorialScene, music2ImageScene, image2MusicTutorialScene, image2MusicScene, epilogueScene;
     private static JSONObject levelsJSONObject;
 
@@ -112,10 +112,10 @@ public class App extends Application {
             return;
         }
 
-        currentStage = stage;
-        currentStage.setScene(prologueScene);
-        currentStage.initStyle(StageStyle.UNDECORATED);
-        currentStage.show();
+        primaryStage = stage;
+        primaryStage.setScene(prologueScene);
+        primaryStage.initStyle(StageStyle.UNDECORATED);
+        primaryStage.show();
     }
 
     private static Scene createPrologueScene(AnchorPane root) {
@@ -215,16 +215,16 @@ public class App extends Application {
         colorChooserM2I.setPrefSize(30, 30);
         colorChooserM2I.setStyle("-fx-background-radius: 15; -fx-background-color: white; -fx-border-radius: 15; -fx-border-color: black;");
         colorChooserM2I.setOnAction(e -> {
-            CustomColorPicker colorPicker = new CustomColorPicker();
-            colorPicker.setCurrentColor(imageColorPropertyM2I.get());
+            CustomColorPicker colorPickerM2I = new CustomColorPicker();
+            colorPickerM2I.setCurrentColor(imageColorPropertyM2I.get());
 
-            CustomMenuItem colorPickerMenu = new CustomMenuItem(colorPicker);
-            colorPickerMenu.setHideOnClick(false);
-            imageColorPropertyM2I.bind(colorPicker.customColorProperty());
-            ContextMenu contextMenu = new ContextMenu(colorPickerMenu);
-            contextMenu.setOnHiding(t -> imageColorPropertyM2I.unbind());
-            colorPicker.setContextMenu(contextMenu);
-            contextMenu.show(root, 1100, 442);
+            CustomMenuItem colorPickerMenuM2I = new CustomMenuItem(colorPickerM2I);
+            colorPickerMenuM2I.setHideOnClick(false);
+            imageColorPropertyM2I.bind(colorPickerM2I.customColorProperty());
+            ContextMenu contextMenuM2I = new ContextMenu(colorPickerMenuM2I);
+            contextMenuM2I.setOnHiding(t -> imageColorPropertyM2I.unbind());
+            colorPickerM2I.setContextMenu(contextMenuM2I);
+            contextMenuM2I.show(root, 1100, 442);
         });
 
         paletteM2I.setLayoutX(449.2);
@@ -522,7 +522,7 @@ public class App extends Application {
         button.setLayoutX(575);
         button.setLayoutY(575);
         button.setOnAction(e -> {
-            currentStage.close();
+            primaryStage.close();
             System.exit(0);
         });
 
@@ -533,7 +533,7 @@ public class App extends Application {
     }
     
     private static void changeScene(Scene scene) {
-        currentStage.setScene(scene);
+        primaryStage.setScene(scene);
     }
 
     /* Music to Image Functions and Structures */
