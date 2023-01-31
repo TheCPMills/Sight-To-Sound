@@ -1,0 +1,26 @@
+{
+    "Major": {
+        "name": "Major",
+        "scale": [0, 0, 2, 4, 4, 5, 5, 7, 7, 9, 11, 11, 12]
+    },
+    "Natural Minor": {
+        "name": "Natural Minor",
+        "scale": [0, 0, 2, 3, 3, 5, 5, 7, 7, 8, 10, 10, 12]
+    },
+    "Major Pentatonic": {
+        "name": "Major Pentatonic",
+        "scale": [0, 0, 2, 2, 4, 4, 7, 7, 7, 9, 9, 12, 12]
+    },
+    "Minor Pentatonic": {
+        "name": "Minor Pentatonic",
+        "scale": [0, 0, 3, 3, 5, 5, 7, 7, 7, 10, 10, 12, 12]
+    },
+    "Whole Tone": {
+        "name": "Whole Tone",
+        "scale": [0, 0, 2, 2, 4, 4, 6, 6, 8, 8, 10, 10, 12]
+    },
+    "Chromatic": {
+        "name": "Chromatic",
+        "scale": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    }
+}

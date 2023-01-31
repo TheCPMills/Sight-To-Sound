@@ -1,0 +1,12 @@
+{
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Launch Main",
+            "request": "launch",
+            "mainClass": "Main",
+            "vmArgs": "--module-path C:/Users/cpmil//javafx-sdk-17.0.2/lib --add-modules javafx.controls,javafx.fxml",
+            "projectName": "Sight-To-Sound_55e57162"
+        }
+    ]
+}
