@@ -1,8 +1,9 @@
 {
     "1a":  {
-
+        "song": "testSong"
     },
     "1b":  {
+        "image": "testSVG",
         "timbreClass": 0.0,
         "mode": 0.0,
         "overallVolume": 44.0,

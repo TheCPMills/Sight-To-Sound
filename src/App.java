@@ -21,8 +21,11 @@ import javafx.stage.*;
 
 // audio packages
 import jmusic.*;
+
 import javax.sound.midi.*;
 import javax.sound.sampled.*;
+
+import org.javatuples.Pair;
 import org.jfugue.realtime.*;
 
 // JSON packages
@@ -34,6 +37,8 @@ public class App extends Application {
     private static Stage primaryStage;
     private static Scene prologueScene, music2ImageTutorialScene, music2ImageScene, image2MusicTutorialScene, image2MusicScene, epilogueScene;
     private static JSONObject levelsJSONObject;
+    private static int currentLevel;
+    private static Random rng;
 
     /* Music to Image Components */
     private static MacosLabel titleLabelM2I = new MacosLabel("Adjust the visual appearence of the image below to match the musical piece.");
@@ -72,8 +77,8 @@ public class App extends Application {
     private static Knob modeKnobI2M = new Knob(0, 5, 0);
     private static Knob volumeKnobI2M = new Knob(0, 92, 44);
     private static Knob tempoKnobI2M = new Knob(0, 175, 66);
-    private static Knob dynamicVariationKnobI2M = new Knob(0, 1, 0);
-    private static Knob rhythmicRegularityKnobI2M = new Knob(0, 1, 0);
+    private static Knob dynamicVariationKnobI2M = new Knob(0, 3, 0);
+    private static Knob rhythmicRegularityKnobI2M = new Knob(0, 5, 0);
 
     private static RealtimePlayer mediaPlayerI2M;
     private static MacosButton playButtonI2M = new MacosButton("Play");
@@ -92,13 +97,6 @@ public class App extends Application {
         AnchorPane image2MusicRoot = new AnchorPane();
         AnchorPane epilogueRoot = new AnchorPane();
 
-        prologueScene = createPrologueScene(prologueRoot);
-        music2ImageTutorialScene = createMusic2ImageTutorialScene(music2ImageTutorialRoot);
-        music2ImageScene = createMusic2ImageScene(music2ImageRoot);
-        image2MusicTutorialScene = createImage2MusicTutorialScene(image2MusicTutorialRoot);
-        image2MusicScene = createImage2MusicScene(image2MusicRoot);
-        epilogueScene = createEpilogueScene(epilogueRoot);
-
         JSONParser parser = new JSONParser();
         try {
             levelsJSONObject = (JSONObject) parser.parse(new FileReader("resources/levels.json"));
@@ -111,6 +109,16 @@ public class App extends Application {
             System.exit(1);
             return;
         }
+
+        prologueScene = createPrologueScene(prologueRoot);
+        music2ImageTutorialScene = createMusic2ImageTutorialScene(music2ImageTutorialRoot);
+        music2ImageScene = createMusic2ImageScene(music2ImageRoot);
+        image2MusicTutorialScene = createImage2MusicTutorialScene(image2MusicTutorialRoot);
+        image2MusicScene = createImage2MusicScene(image2MusicRoot);
+        epilogueScene = createEpilogueScene(epilogueRoot);
+
+        currentLevel = 1;
+        rng = new Random(currentLevel * 0xdeaf);
 
         primaryStage = stage;
         primaryStage.setScene(prologueScene);
@@ -174,15 +182,7 @@ public class App extends Application {
         titleLabelM2I.setLayoutY(14);
         titleLabelM2I.setStyle("-fx-font-size: 18px;");
 
-        try {
-            File file = new File("assets/music/song.wav");
-            mediaPlayerM2I = new SimpleAudioPlayer(file);
-            mediaPlayerM2I.addChangeListener();
-
-            playheadM2I = new JFXSlider(0, mediaPlayerM2I.getDurationInSeconds() * 2, 0);
-        } catch (UnsupportedAudioFileException | IOException | LineUnavailableException ex) {
-            System.out.println("Error: Can't locate the audio file.");
-        }
+        setLevelM2I(1);
 
         splineGroupM2I.setLayoutX(0);
         splineGroupM2I.setLayoutY(0);
@@ -416,13 +416,13 @@ public class App extends Application {
         dynamicVariationKnobI2M.setLayoutX(471);
         dynamicVariationKnobI2M.setLayoutY(508);
         dynamicVariationKnobI2M.valueProperty().addListener((observable, oldValue, newValue) -> {
-            dynamicVariationKnobI2M.setValue(Math.round(newValue.doubleValue() * 8) / 8.0);
+            dynamicVariationKnobI2M.setValue(Math.round(newValue.doubleValue()));
         });
 
         rhythmicRegularityKnobI2M.setLayoutX(556);
         rhythmicRegularityKnobI2M.setLayoutY(508);
         rhythmicRegularityKnobI2M.valueProperty().addListener((observable, oldValue, newValue) -> {
-            rhythmicRegularityKnobI2M.setValue(Math.round(newValue.doubleValue() * 8) / 8.0);
+            rhythmicRegularityKnobI2M.setValue(Math.round(newValue.doubleValue()));
         });
 
         try {
@@ -446,12 +446,16 @@ public class App extends Application {
         });
         playButtonI2M.disableProperty().addListener((observable, oldValue, newValue) -> {
             if (newValue) {
-                mediaPlayerI2M.play(generateMusicI2M());
+                Pair<String, Double> song = generateMusicI2M();
+                String pattern = song.getValue0();
+                double length = song.getValue1().doubleValue() * 240000;
+
+                mediaPlayerI2M.play(pattern);
 
                 Thread t = new Thread(() -> {
                     try {
                         int tempo = (int) tempoKnobI2M.getValue() + 25;
-                        Thread.sleep((long) (960000.0 / tempo));
+                        Thread.sleep((long) (length / tempo));
                         Platform.runLater(() -> {
                             playButtonI2M.setText("Play");
                             playButtonI2M.setDisable(false);
@@ -491,7 +495,7 @@ public class App extends Application {
             return null;
         }
 
-        resetI2M();
+        setLevelI2M(1);
 
         root.getChildren().add(titleLabelI2M);
         root.getChildren().add(imageI2M);
@@ -749,7 +753,20 @@ public class App extends Application {
     }
 
     private static void setLevelM2I(int level) {
-        // TODO: Set the level of the study
+        String levelID = level + "a";
+        JSONObject levelJSONObject = (JSONObject) levelsJSONObject.get(levelID);
+
+        try {
+            File file = new File("assets/music/" + levelJSONObject.get("song") + ".wav");
+            mediaPlayerM2I = new SimpleAudioPlayer(file);
+            mediaPlayerM2I.addChangeListener();
+
+            playheadM2I = new JFXSlider(0, mediaPlayerM2I.getDurationInSeconds() * 2, 0);
+        } catch (UnsupportedAudioFileException | IOException | LineUnavailableException ex) {
+            System.out.println("Error: Can't locate the audio file.");
+        }
+
+        resetM2I();
     }
 
     private static void gatherResponseM2I() {
@@ -1015,16 +1032,18 @@ public class App extends Application {
     }
 
     /* Image to Music Functions and Structures */
-    private static void resetI2M() {
-        for (int i = 0; i < pitchesI2M.length; i++) {
-            pitchesI2M[i] = (int) (Math.random() * 13);
+    private static void resetI2M(String fileName) {
+        LinkedList<Integer> pitches = SVGReader.getSong(fileName);
+        pitchesI2M = new int[pitches.size()];
+        for (int i = 0; i < pitches.size(); i++) {
+            pitchesI2M[i] = pitches.get(i);
         }
 
-        imageI2M.setContent("M 176.33333333333334 406.6666666666667 C 249.0 407.3333333333333 76.33333333333327 52.666666666666664 635.0 50.0 C 635.0 206.66666666666666 599.0 264.6666666666667 381.6666666666667 332.66666666666663 C 523.0 463.99999999999994 370.3333333333333 514.6666666666666 62.333333333333336 492.0 C 126.66666666666667 416.0 46.99999999999997 378.0 74.00000000000001 306.66666666666663 C 122.33333333333333 300.0 107.33333333333333 363.3333333333333 176.33333333333334 406.6666666666667 Z");
-        imageI2M.setFill(Color.rgb(25, 100, 49));
+        imageI2M.setContent(SVGReader.getSVGPath(fileName));
+        imageI2M.setFill(SVGReader.getSVGFill(fileName));
     }
 
-    private static String generateMusicI2M() {
+    private static Pair<String, Double> generateMusicI2M() {
         JSONObject modeJSONObject = (JSONObject) modesJSONObjectI2M.get(getModeNameI2M());
         JSONArray scaleJSONArray = (JSONArray) modeJSONObject.get("scale");
 
@@ -1033,11 +1052,21 @@ public class App extends Application {
             scale[i] = Integer.parseInt(scaleJSONArray.get(i).toString());
         }
 
+        LinkedList<NoteDuration> noteDurations = getDurations((int) rhythmicRegularityKnobI2M.getValue());
+        double totalDuration = 0;
+        for (NoteDuration noteDuration : noteDurations) {
+            totalDuration += noteDuration.getDuration();
+        }
+
         LinkedList<Note> notes = new LinkedList<>();
         for (int i = 0; i < pitchesI2M.length; i++) {
-            int pitch = scale[pitchesI2M[i]] + 48;
-            float duration = NoteDuration.CROTCHET.getDuration();
+            int pitch = scale[pitchesI2M[i]] + 60;
+    
             int velocity = (int) (volumeKnobI2M.getValue() + 20);
+            int dynamicVariation = getDynamicVariationModifierI2M((int) dynamicVariationKnobI2M.getValue());
+            velocity = Math.min(112, Math.max(20, velocity + 13 * dynamicVariation));
+
+            float duration = noteDurations.get(i).getDuration();
 
             notes.add(new Note(pitch, velocity, duration));
         }
@@ -1046,7 +1075,209 @@ public class App extends Application {
         for (Note note : notes) {
             melody.addNote(note);
         }
-        return "T" + ((int) tempoKnobI2M.getValue() + 25) + " " + melody.toString();
+        return new Pair<>("T" + ((int) tempoKnobI2M.getValue() + 25) + " " + melody.toString(), totalDuration);
+    }
+
+    private static int getDynamicVariationModifierI2M(int level) {
+        double randomValue = rng.nextDouble();
+        switch (level) {
+            default:
+            case 0:
+                return 0;
+            case 1:
+                if (randomValue < 0.3333) {
+                    return -1;
+                } else if (randomValue >= 0.3333 && randomValue < 0.6667) {
+                    return 0;
+                } else {
+                    return 1;
+                }
+            case 2:
+                if (randomValue < 0.2) {
+                    return -2;
+                } else if (randomValue >= 0.2 && randomValue < 0.4) {
+                    return -1;
+                } else if (randomValue >= 0.4 && randomValue < 0.6) {
+                    return 0;
+                } else if (randomValue >= 0.6 && randomValue < 0.8) {
+                    return 1;
+                } else {
+                    return 2;
+                }
+            case 3:
+                if (randomValue < 0.142857142857) {
+                    return -3;
+                } else if (randomValue >= 0.142857142857 && randomValue < 0.285714285714) {
+                    return -2;
+                } else if (randomValue >= 0.285714285714 && randomValue < 0.428571428571) {
+                    return -1;
+                } else if (randomValue >= 0.428571428571 && randomValue < 0.571428571429) {
+                    return 0;
+                } else if (randomValue >= 0.571428571429 && randomValue < 0.714285714286) {
+                    return 1;
+                } else if (randomValue >= 0.714285714286 && randomValue < 0.857142857143) {
+                    return 2;
+                } else {
+                    return 3;
+                }
+        }
+
+    }
+
+    private static LinkedList<NoteDuration> getDurations(int level) {
+        LinkedList<NoteDuration> durations;
+
+        switch (level) {
+            default:
+            case 0:
+                durations = new LinkedList<>() {
+                    {
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                    }
+                };
+                break;
+            case 1:
+                durations = new LinkedList<>() {
+                    {
+                        add(NoteDuration.QUAVER);
+                        add(NoteDuration.QUAVER);
+                        add(NoteDuration.QUAVER);
+                        add(NoteDuration.QUAVER);
+                        add(NoteDuration.QUAVER);
+                        add(NoteDuration.QUAVER);
+                        add(NoteDuration.QUAVER);
+                        add(NoteDuration.QUAVER);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                    }
+                };
+                break;
+            case 2:
+                durations = new LinkedList<>() {
+                    {
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.QUAVER);
+                        add(NoteDuration.QUAVER);
+                        add(NoteDuration.QUAVER);
+                        add(NoteDuration.QUAVER);
+                        add(NoteDuration.QUAVER);
+                        add(NoteDuration.QUAVER);
+                        add(NoteDuration.QUAVER);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                    }
+                };
+                break;
+            case 3:
+                durations = new LinkedList<>() {
+                    {
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.QUAVER);
+                        add(NoteDuration.QUAVER);
+                        add(NoteDuration.QUAVER);
+                        add(NoteDuration.QUAVER);
+                        add(NoteDuration.QUAVER);
+                        add(NoteDuration.QUAVER);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.MINIM);
+                        add(NoteDuration.MINIM);
+                    }
+                };
+                break;
+            case 4:
+                durations = new LinkedList<>() {
+                    {
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.QUAVER);
+                        add(NoteDuration.QUAVER);
+                        add(NoteDuration.QUAVER);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.MINIM);
+                        add(NoteDuration.MINIM);
+                        add(NoteDuration.MINIM);
+                    }
+                };
+                break;
+            case 5:
+                durations = new LinkedList<>() {
+                    {
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.QUAVER);
+                        add(NoteDuration.QUAVER);
+                        add(NoteDuration.QUAVER);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.MINIM);
+                    }
+                };
+                break;
+
+        }
+
+        // Shuffle the list
+        Random tempRNG = new Random(currentLevel);
+        Collections.shuffle(durations, tempRNG);
+
+
+        if (level == 4) {
+            int index = rng.nextInt(0, 13);
+            durations.add(index, NoteDuration.CROCHET_TRIPLET);
+            durations.add(index, NoteDuration.QUAVER_TRIPLET);
+
+        } else if (level == 5) {
+            int index = rng.nextInt(0, 9);
+            durations.add(index, NoteDuration.QUAVER_TRIPLET);
+            durations.add(index, NoteDuration.CROCHET_TRIPLET);
+            durations.add(index, NoteDuration.QUAVER_TRIPLET);
+            durations.add(index, NoteDuration.CROCHET_TRIPLET);
+            durations.add(index, NoteDuration.CROCHET_TRIPLET);
+            durations.add(index, NoteDuration.MINIM_TRIPLET);
+        }
+
+        return durations;
     }
 
     private static void gatherResponseI2M() {
@@ -1057,7 +1288,7 @@ public class App extends Application {
             BufferedWriter bufferedWriter = new BufferedWriter(fileWriter);
 
             bufferedWriter.write("Timbre Class,Mode,Overall Volume,Tempo,Dynamic Variation,Rhythmic Regularity\n");
-            bufferedWriter.write(getTimbreNameI2M() + "," + getModeNameI2M() + "," + getDynamicNameI2M() + "," + getTempoNameI2M() + "," + dynamicVariationKnobI2M.getValue() + "," + rhythmicRegularityKnobI2M.getValue());
+            bufferedWriter.write(getTimbreNameI2M() + "," + getModeNameI2M() + "," + getDynamicNameI2M() + "," + getTempoNameI2M() + "," + (int) dynamicVariationKnobI2M.getValue() + "," + (int) rhythmicRegularityKnobI2M.getValue());
 
             bufferedWriter.close();
         } catch (IOException e) {
@@ -1069,6 +1300,7 @@ public class App extends Application {
         String levelID = level + "b";
         JSONObject levelJSONObject = (JSONObject) levelsJSONObject.get(levelID);
 
+        resetI2M((String) levelJSONObject.get("image"));
         timbreClassKnobI2M.setValue((Double) levelJSONObject.get("timbreClass"));
         modeKnobI2M.setValue((Double) levelJSONObject.get("mode"));
         volumeKnobI2M.setValue((Double) levelJSONObject.get("overallVolume"));
