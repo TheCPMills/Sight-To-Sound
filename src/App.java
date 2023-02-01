@@ -1052,6 +1052,8 @@ public class App extends Application {
             scale[i] = Integer.parseInt(scaleJSONArray.get(i).toString());
         }
 
+        int key = rng.nextInt(-4, 8) + 60;
+
         LinkedList<NoteDuration> noteDurations = getDurations((int) rhythmicRegularityKnobI2M.getValue());
         double totalDuration = 0;
         for (NoteDuration noteDuration : noteDurations) {
@@ -1060,7 +1062,7 @@ public class App extends Application {
 
         LinkedList<Note> notes = new LinkedList<>();
         for (int i = 0; i < pitchesI2M.length; i++) {
-            int pitch = scale[pitchesI2M[i]] + 60;
+            int pitch = scale[pitchesI2M[i]] + key;
     
             int velocity = (int) (volumeKnobI2M.getValue() + 20);
             int dynamicVariation = getDynamicVariationModifierI2M((int) dynamicVariationKnobI2M.getValue());
