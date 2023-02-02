@@ -35,7 +35,7 @@ import org.json.simple.parser.*;
 public class App extends Application {
     /* Main Application Components */
     private static Stage primaryStage;
-    private static Scene prologueScene, music2ImageTutorialScene, music2ImageScene, image2MusicTutorialScene, image2MusicScene, epilogueScene;
+    private static Scene prologueScene, questionaireScene, music2ImageTutorialScene, music2ImageScene, image2MusicTutorialScene, image2MusicScene, epilogueScene;
     private static JSONObject levelsJSONObject;
     private static int currentLevel;
     private static Random rng;
@@ -61,6 +61,7 @@ public class App extends Application {
     private static Slider playheadM2I;
     private static Text playheadTextM2I;
     private static Text songDurationTextM2I;
+    private static BufferedWriter responseWriterM2I;
 
     /* Image to Music Components */
     private static MacosLabel titleLabelI2M = new MacosLabel("Adjust the musical parameters to match the image below.");
@@ -87,10 +88,13 @@ public class App extends Application {
     private static JSONObject modesJSONObjectI2M;
     private static int[] pitchesI2M = new int[16];
     private static int[] instrumentsI2M = {0, 25, 40, 71, 56, 11};
+    private static int key;
+    private static BufferedWriter responseWriterI2M;
 
     /* Main Application Functions */
     @Override public void start(Stage stage) {
         AnchorPane prologueRoot = new AnchorPane();
+        AnchorPane questionaireRoot = new AnchorPane();
         AnchorPane music2ImageTutorialRoot = new AnchorPane();
         AnchorPane music2ImageRoot = new AnchorPane();
         AnchorPane image2MusicTutorialRoot = new AnchorPane();
@@ -110,15 +114,26 @@ public class App extends Application {
             return;
         }
 
+        try {
+            responseWriterM2I = new BufferedWriter(new FileWriter(new File("assets/data/responseM2I.csv")));
+            responseWriterM2I.write("Hue,Saturation,Brightness,Path,Curvature,Aspect Ratio\n");
+
+            responseWriterI2M = new BufferedWriter(new FileWriter(new File("assets/data/responseI2M.csv")));
+            responseWriterI2M.write("Timbre Class,Mode,Overall Volume,Tempo,Dynamic Variation,Rhythmic Regularity\n");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        currentLevel = 1;
+        rng = new Random(currentLevel * 0xdeaf);
+
         prologueScene = createPrologueScene(prologueRoot);
+        questionaireScene = createQuestionaireScene(questionaireRoot);
         music2ImageTutorialScene = createMusic2ImageTutorialScene(music2ImageTutorialRoot);
         music2ImageScene = createMusic2ImageScene(music2ImageRoot);
         image2MusicTutorialScene = createImage2MusicTutorialScene(image2MusicTutorialRoot);
         image2MusicScene = createImage2MusicScene(image2MusicRoot);
         epilogueScene = createEpilogueScene(epilogueRoot);
-
-        currentLevel = 1;
-        rng = new Random(currentLevel * 0xdeaf);
 
         primaryStage = stage;
         primaryStage.setScene(prologueScene);
@@ -130,6 +145,28 @@ public class App extends Application {
         root.setPrefSize(660, 625);
 
         Text text = new Text("This page would welcome the participant.");
+        text.setFont(Font.font("Arial", FontWeight.BOLD, 20));
+        text.setFill(Color.BLACK);
+        text.setLayoutX(100);
+        text.setLayoutY(300);
+
+        MacosButton button = new MacosButton("Continue");
+        button.setLayoutX(575);
+        button.setLayoutY(575);
+        button.setOnAction(e -> {
+            changeScene(questionaireScene);
+        });
+
+        root.getChildren().add(text);
+        root.getChildren().add(button);
+
+        return new Scene(root);
+    }
+
+    private static Scene createQuestionaireScene(AnchorPane root) {
+        root.setPrefSize(660, 625);
+
+        Text text = new Text("This page would have the questionaire.");
         text.setFont(Font.font("Arial", FontWeight.BOLD, 20));
         text.setFill(Color.BLACK);
         text.setLayoutX(100);
@@ -190,7 +227,6 @@ public class App extends Application {
         imageM2I.setLayoutX(0);
         imageM2I.setLayoutY(0);
 
-        resetM2I();
         imageM2I.fillProperty().bind(imageColorPropertyM2I);
 
         audioPlayerBoxM2I.setLayoutX(182);
@@ -203,7 +239,7 @@ public class App extends Application {
             colorChooserM2I.setStyle("-fx-background-radius: 15; -fx-background-color: rgb(" + (int) (newValue.getRed() * 255) + ", " + (int) (newValue.getGreen() * 255) + ", " + (int) (newValue.getBlue() * 255) + "); -fx-border-radius: 15; -fx-border-color: black;");
             
             double brightness = newValue.getBrightness();
-            double x = (brightness < 0.5) ? (1 - Math.sqrt(1 - Math.pow(2 *brightness, 2))) / 2 : (Math.sqrt(1 - Math.pow(-2 * brightness + 2, 2)) + 1) / 2;
+            double x = (brightness < 0.5) ? (1 - Math.sqrt(1 - Math.pow(2 * brightness, 2))) / 2 : (Math.sqrt(1 - Math.pow(-2 * brightness + 2, 2)) + 1) / 2;
 
             for (int i = 0; i < 3; i++) {
                 ((SVGPath) (paletteM2I.getChildren().get(i))).setFill(Color.hsb(0, 0, 1 - x));
@@ -268,9 +304,12 @@ public class App extends Application {
             }
         });
         
+        Rectangle greySquare = new Rectangle(412, 550, 35, 10);
+        greySquare.setFill(new Color(0.7686274509803922, 0.7686274509803922, 0.7686274509803922, 1));
+
         playheadM2I.setLayoutX(253.4);
         playheadM2I.setLayoutY(550.5);
-        playheadM2I.setPrefSize(160, 10);
+        playheadM2I.setPrefSize(195, 10);
         playheadM2I.setDisable(true);
         playheadM2I.skinProperty().addListener(e -> {
             Pane thumb = (Pane) playheadM2I.lookup(".thumb");
@@ -301,7 +340,13 @@ public class App extends Application {
         submitButtonM2I.setLayoutY(590);
         submitButtonM2I.setPrefSize(100, 30);
         submitButtonM2I.setOnAction(e -> {
-            gatherResponseM2I();
+            try {
+                gatherResponseM2I();
+                responseWriterM2I.close();
+            } catch (IOException e1) {
+                e1.printStackTrace();
+            }
+
             changeScene(image2MusicTutorialScene);
         });
 
@@ -311,10 +356,11 @@ public class App extends Application {
         root.getChildren().add(audioPlayerBoxM2I);
         root.getChildren().add(playPauseButtonBackground);
         root.getChildren().add(playPauseButtonM2I);
+        root.getChildren().add(playheadM2I);
+        root.getChildren().add(greySquare);
+        root.getChildren().add(playheadTextM2I);
         root.getChildren().add(colorChooserM2I);
         root.getChildren().add(paletteM2I);
-        root.getChildren().add(playheadM2I);
-        root.getChildren().add(playheadTextM2I);
         root.getChildren().add(songDurationTextM2I);
         root.getChildren().add(submitButtonM2I);
 
@@ -429,7 +475,7 @@ public class App extends Application {
             mediaPlayerI2M = new RealtimePlayer();
         } catch (MidiUnavailableException e) {
         }
-        
+
         playButtonI2M.setLayoutX(280);
         playButtonI2M.setLayoutY(540);
         playButtonI2M.setPrefSize(100, 30);
@@ -478,7 +524,13 @@ public class App extends Application {
         submitButtonI2M.setLayoutY(575);
         submitButtonI2M.setPrefSize(100, 30);
         submitButtonI2M.setOnAction(e -> {
-            gatherResponseI2M();
+            try {
+                gatherResponseI2M();
+                responseWriterI2M.close();
+            } catch (IOException e1) {
+                e1.printStackTrace();
+            }
+
             changeScene(epilogueScene);
         });
 
@@ -602,8 +654,7 @@ public class App extends Application {
         // remove the curve
         CurveInfo removedCurveInfo = splineCurvesInfoM2I.remove(curveIndex);
         splineCurvesM2I.remove(curve);
-        removedCurveInfo.removeCurveFromGroup(splineGroupM2I);
-        
+        removedCurveInfo.removeCurveFromGroup();
 
         // create a curve from the start point to halfway point
         Anchor halfwayPointAnchor = new Anchor(Color.BLACK, halfwayPoint.getX(), halfwayPoint.getY(), 5);
@@ -612,14 +663,14 @@ public class App extends Application {
         splineCurvesInfoM2I.add(curveIndex, firstHalfCurveInfo);
         CubicCurve firstHalfCurve = firstHalfCurveInfo.curve;
         splineCurvesM2I.add(curveIndex, firstHalfCurve);
-        firstHalfCurveInfo.addCurveToGroup(splineGroupM2I);
+        firstHalfCurveInfo.addCurveToGroup();
 
         // create a curve from the halfway point to the end point
         CurveInfo secondHalfCurveInfo = createCurve(halfwayPointAnchor, endAnchor);
         splineCurvesInfoM2I.add(curveIndex + 1, secondHalfCurveInfo);
         CubicCurve secondHalfCurve = secondHalfCurveInfo.curve;
         splineCurvesM2I.add(curveIndex + 1, secondHalfCurve);
-        secondHalfCurveInfo.addCurveToGroup(splineGroupM2I);
+        secondHalfCurveInfo.addCurveToGroup();
 
         imageM2I.setContent(getPath());
     }
@@ -631,10 +682,10 @@ public class App extends Application {
         // remove the curves
         CurveInfo curve1Info = splineCurvesInfoM2I.remove(curve1Index);
         splineCurvesM2I.remove(curve1);
-        curve1Info.removeCurveFromGroup(splineGroupM2I);
+        curve1Info.removeCurveFromGroup();
         CurveInfo curve2Info = splineCurvesInfoM2I.remove(curve1Index % splineCurvesM2I.size());
         splineCurvesM2I.remove(curve2);
-        curve2Info.removeCurveFromGroup(splineGroupM2I);
+        curve2Info.removeCurveFromGroup();
 
         // remove the middle point
         splineAnchorsM2I.remove(curve1Info.endPoint);
@@ -649,7 +700,7 @@ public class App extends Application {
         splineCurvesInfoM2I.add(newCurveIndex, newCurveInfo);
         CubicCurve newCurve = newCurveInfo.curve;
         splineCurvesM2I.add(newCurveIndex, newCurve);
-        newCurveInfo.addCurveToGroup(splineGroupM2I);
+        newCurveInfo.addCurveToGroup();
 
         imageM2I.setContent(getPath());
     }
@@ -671,7 +722,7 @@ public class App extends Application {
                 splineCurvesInfoM2I.add(firstCurveInfo);
                 CubicCurve firstCurve = firstCurveInfo.curve;
                 splineCurvesM2I.add(firstCurve);
-                firstCurveInfo.addCurveToGroup(splineGroupM2I);
+                firstCurveInfo.addCurveToGroup();
                 break;
             case 3:
                 // Create a curve from the second point to the third point
@@ -680,7 +731,7 @@ public class App extends Application {
                 splineCurvesInfoM2I.add(secondCurveInfo);
                 CubicCurve secondCurve = secondCurveInfo.curve;
                 splineCurvesM2I.add(secondCurve);
-                secondCurveInfo.addCurveToGroup(splineGroupM2I);
+                secondCurveInfo.addCurveToGroup();
                 splineAnchorsM2I.add(thirdAnchor);
 
                 // Create a curve from the third point to the first point
@@ -688,13 +739,13 @@ public class App extends Application {
                 splineCurvesInfoM2I.add(thirdCurveInfo);
                 CubicCurve thirdCurve = thirdCurveInfo.curve;
                 splineCurvesM2I.add(thirdCurve);
-                thirdCurveInfo.addCurveToGroup(splineGroupM2I);
+                thirdCurveInfo.addCurveToGroup();
                 break;
             default:
                 // remove the last curve
                 CurveInfo lastCurveInfo = splineCurvesInfoM2I.removeLast();
                 splineCurvesM2I.removeLast();
-                lastCurveInfo.removeCurveFromGroup(splineGroupM2I);
+                lastCurveInfo.removeCurveFromGroup();
 
                 // Create a curve from the penultimate point to the last point
                 Anchor lastAnchor = new Anchor(Color.BLACK, point.getX(), point.getY(), 5);
@@ -702,7 +753,7 @@ public class App extends Application {
                 splineCurvesInfoM2I.add(penultimateCurveInfo);
                 CubicCurve penultimateCurve = penultimateCurveInfo.curve;
                 splineCurvesM2I.add(penultimateCurve);
-                penultimateCurveInfo.addCurveToGroup(splineGroupM2I);
+                penultimateCurveInfo.addCurveToGroup();
                 splineAnchorsM2I.add(lastAnchor);
 
                 // Create a curve from the last point to the first point
@@ -710,7 +761,7 @@ public class App extends Application {
                 splineCurvesInfoM2I.add(newLastCurveInfo);
                 CubicCurve newLastCurve = newLastCurveInfo.curve;
                 splineCurvesM2I.add(newLastCurve);
-                newLastCurveInfo.addCurveToGroup(splineGroupM2I);
+                newLastCurveInfo.addCurveToGroup();
                 break;
         }
         imageM2I.setContent(getPath());
@@ -722,7 +773,7 @@ public class App extends Application {
         return new Point2d(x, y);
     }
 
-    private static void initCurves() {
+    private static void initializeCurves() {
         addPoint(new Point2d(25.0, 50.0));
         addPoint(new Point2d(635.0, 50.0));
         addPoint(new Point2d(635.0, 520.0));
@@ -734,7 +785,7 @@ public class App extends Application {
         splineAnchorsM2I.clear();
         splineCurvesM2I.clear();
         splineGroupM2I.getChildren().clear();
-        initCurves();
+        initializeCurves();
         colorChooserM2I.setStyle("-fx-background-radius: 15; -fx-background-color: white; -fx-border-radius: 15; -fx-border-color: black;");
         imageColorPropertyM2I.setValue(Color.WHITE);
     }
@@ -770,17 +821,9 @@ public class App extends Application {
     }
 
     private static void gatherResponseM2I() {
-        File file = new File("assets/data/responseM2I.csv");
-
         try {
-            FileWriter fileWriter = new FileWriter(file);
-            BufferedWriter bufferedWriter = new BufferedWriter(fileWriter);
-
             Color color = imageColorPropertyM2I.getValue();
-            bufferedWriter.write("Hue,Saturation,Brightness,Path,Curvature,Aspect Ratio\n");
-            bufferedWriter.write(color.getHue() + "," + color.getSaturation() + "," + color.getBrightness() + "," + getPath() + "," + "TBD" + "," + "TBD");
-
-            bufferedWriter.close();
+            responseWriterM2I.write(color.getHue() + "," + color.getSaturation() + "," + color.getBrightness() + "," + getPath() + "," + "TBD" + "," + "TBD");
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -798,32 +841,32 @@ public class App extends Application {
     }
 
     static record CurveInfo(CubicCurve curve, Anchor startPoint, Anchor endPoint, Anchor controlPoint1, Anchor controlPoint2, ControlLine controlLine1, ControlLine controlLine2) {
-        public void addCurveToGroup(Group group) {
-            if (!group.getChildren().contains(curve)) {
-                group.getChildren().add(curve);
+        public void addCurveToGroup() {
+            if (!splineGroupM2I.getChildren().contains(curve)) {
+                splineGroupM2I.getChildren().add(curve);
             }
-            if (!group.getChildren().contains(startPoint)) {
-                group.getChildren().add(startPoint);
+            if (!splineGroupM2I.getChildren().contains(startPoint)) {
+                splineGroupM2I.getChildren().add(startPoint);
             }
-            if (!group.getChildren().contains(endPoint)) {
-                group.getChildren().add(endPoint);
+            if (!splineGroupM2I.getChildren().contains(endPoint)) {
+                splineGroupM2I.getChildren().add(endPoint);
             }
-            if (!group.getChildren().contains(controlPoint1)) {
-                group.getChildren().add(controlPoint1);
+            if (!splineGroupM2I.getChildren().contains(controlPoint1)) {
+                splineGroupM2I.getChildren().add(controlPoint1);
             }
-            if (!group.getChildren().contains(controlPoint2)) {
-                group.getChildren().add(controlPoint2);
+            if (!splineGroupM2I.getChildren().contains(controlPoint2)) {
+                splineGroupM2I.getChildren().add(controlPoint2);
             }
-            if (!group.getChildren().contains(controlLine1)) {
-                group.getChildren().add(controlLine1);
+            if (!splineGroupM2I.getChildren().contains(controlLine1)) {
+                splineGroupM2I.getChildren().add(controlLine1);
             }
-            if (!group.getChildren().contains(controlLine2)) {
-                group.getChildren().add(controlLine2);
+            if (!splineGroupM2I.getChildren().contains(controlLine2)) {
+                splineGroupM2I.getChildren().add(controlLine2);
             }
         }
 
-        public void removeCurveFromGroup(Group group) {
-            group.getChildren().removeAll(curve, startPoint, endPoint, controlPoint1, controlPoint2, controlLine1, controlLine2);
+        public void removeCurveFromGroup() {
+            splineGroupM2I.getChildren().removeAll(curve, startPoint, endPoint, controlPoint1, controlPoint2, controlLine1, controlLine2);
         }
 
         public String toString() {
@@ -1039,6 +1082,8 @@ public class App extends Application {
             pitchesI2M[i] = pitches.get(i);
         }
 
+        key = rng.nextInt(-4, 8) + 60;
+
         imageI2M.setContent(SVGReader.getSVGPath(fileName));
         imageI2M.setFill(SVGReader.getSVGFill(fileName));
     }
@@ -1051,8 +1096,6 @@ public class App extends Application {
         for (int i = 0; i < scaleJSONArray.size(); i++) {
             scale[i] = Integer.parseInt(scaleJSONArray.get(i).toString());
         }
-
-        int key = rng.nextInt(-4, 8) + 60;
 
         LinkedList<NoteDuration> noteDurations = getDurations((int) rhythmicRegularityKnobI2M.getValue());
         double totalDuration = 0;
@@ -1283,16 +1326,8 @@ public class App extends Application {
     }
 
     private static void gatherResponseI2M() {
-        File file = new File("assets/data/responseI2M.csv");
-
         try {
-            FileWriter fileWriter = new FileWriter(file);
-            BufferedWriter bufferedWriter = new BufferedWriter(fileWriter);
-
-            bufferedWriter.write("Timbre Class,Mode,Overall Volume,Tempo,Dynamic Variation,Rhythmic Regularity\n");
-            bufferedWriter.write(getTimbreNameI2M() + "," + getModeNameI2M() + "," + getDynamicNameI2M() + "," + getTempoNameI2M() + "," + (int) dynamicVariationKnobI2M.getValue() + "," + (int) rhythmicRegularityKnobI2M.getValue());
-
-            bufferedWriter.close();
+            responseWriterI2M.write(getTimbreNameI2M() + "," + getModeNameI2M() + "," + getDynamicNameI2M() + "," + getTempoNameI2M() + "," + (int) dynamicVariationKnobI2M.getValue() + "," + (int) rhythmicRegularityKnobI2M.getValue());
         } catch (IOException e) {
             e.printStackTrace();
         }
