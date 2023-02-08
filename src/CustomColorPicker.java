@@ -33,8 +33,7 @@ public class CustomColorPicker extends VBox {
         }
     };
 
-    public CustomColorPicker() {
-
+    public CustomColorPicker(Button submitButton) {
         getStyleClass().add("my-custom-color");
 
         VBox box = new VBox();
@@ -130,6 +129,7 @@ public class CustomColorPicker extends VBox {
         selectButton.setAlignment(Pos.CENTER);
         selectButton.setOnAction(event -> {
             currentColorProperty.set(customColorProperty.get());
+            submitButton.setDisable(false);
             contextMenu.hide();
         });
 

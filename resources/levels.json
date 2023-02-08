@@ -2,13 +2,181 @@
     "1a":  {
         "song": "testSong"
     },
+    "2a": {
+        "song": "testSong"
+    },
+    "3a": {
+        "song": "testSong"
+    },
+    "4a": {
+        "song": "testSong"
+    },
+    "5a": {
+        "song": "testSong"
+    },
+    "6a": {
+        "song": "testSong"
+    },
+    "7a": {
+        "song": "testSong"
+    },
+    "8a": {
+        "song": "testSong"
+    },
+    "9a": {
+        "song": "testSong"
+    },
+    "10a": {
+        "song": "testSong"
+    },
+    "11a": {
+        "song": "testSong"
+    },
+    "12a": {
+        "song": "testSong"
+    },
+    "13a": {
+        "song": "testSong"
+    },
+    "14a": {
+        "song": "testSong"
+    },
+    "15a": {
+        "song": "testSong"
+    },
     "1b":  {
-        "image": "testSVG",
+        "image": "1a",
         "timbreClass": 0.0,
         "mode": 0.0,
         "overallVolume": 44.0,
         "tempo": 66.0,
         "dynamicVariation": 0.0,
-        "rhythmicRegularity": 0.0
+        "rhythmicRegularity": 5.0
+    },
+    "2b": {
+        "image": "1b",
+        "timbreClass": 0.0,
+        "mode": 0.0,
+        "overallVolume": 44.0,
+        "tempo": 66.0,
+        "dynamicVariation": 0.0,
+        "rhythmicRegularity": 5.0
+    },
+    "3b": {
+        "image": "1c",
+        "timbreClass": 0.0,
+        "mode": 0.0,
+        "overallVolume": 44.0,
+        "tempo": 66.0,
+        "dynamicVariation": 0.0,
+        "rhythmicRegularity": 5.0
+    },
+    "4b": {
+        "image": "2a",
+        "timbreClass": 0.0,
+        "mode": 0.0,
+        "overallVolume": 44.0,
+        "tempo": 66.0,
+        "dynamicVariation": 0.0,
+        "rhythmicRegularity": 5.0
+    },
+    "5b": {
+        "image": "2b",
+        "timbreClass": 0.0,
+        "mode": 0.0,
+        "overallVolume": 44.0,
+        "tempo": 66.0,
+        "dynamicVariation": 0.0,
+        "rhythmicRegularity": 5.0
+    },
+    "6b": {
+        "image": "2c",
+        "timbreClass": 0.0,
+        "mode": 0.0,
+        "overallVolume": 44.0,
+        "tempo": 66.0,
+        "dynamicVariation": 0.0,
+        "rhythmicRegularity": 5.0
+    },
+    "7b": {
+        "image": "3a",
+        "timbreClass": 0.0,
+        "mode": 0.0,
+        "overallVolume": 44.0,
+        "tempo": 66.0,
+        "dynamicVariation": 0.0,
+        "rhythmicRegularity": 5.0
+    },
+    "8b": {
+        "image": "3b",
+        "timbreClass": 0.0,
+        "mode": 0.0,
+        "overallVolume": 44.0,
+        "tempo": 66.0,
+        "dynamicVariation": 0.0,
+        "rhythmicRegularity": 5.0
+    },
+    "9b": {
+        "image": "3c",
+        "timbreClass": 0.0,
+        "mode": 0.0,
+        "overallVolume": 44.0,
+        "tempo": 66.0,
+        "dynamicVariation": 0.0,
+        "rhythmicRegularity": 5.0
+    },
+    "10b": {
+        "image": "4a",
+        "timbreClass": 0.0,
+        "mode": 0.0,
+        "overallVolume": 44.0,
+        "tempo": 66.0,
+        "dynamicVariation": 0.0,
+        "rhythmicRegularity": 5.0
+    },
+    "11b": {
+        "image": "4b",
+        "timbreClass": 0.0,
+        "mode": 0.0,
+        "overallVolume": 44.0,
+        "tempo": 66.0,
+        "dynamicVariation": 0.0,
+        "rhythmicRegularity": 5.0
+    },
+    "12b": {
+        "image": "4c",
+        "timbreClass": 0.0,
+        "mode": 0.0,
+        "overallVolume": 44.0,
+        "tempo": 66.0,
+        "dynamicVariation": 0.0,
+        "rhythmicRegularity": 5.0
+    },
+    "13b": {
+        "image": "5a",
+        "timbreClass": 0.0,
+        "mode": 0.0,
+        "overallVolume": 44.0,
+        "tempo": 66.0,
+        "dynamicVariation": 0.0,
+        "rhythmicRegularity": 5.0
+    },
+    "14b": {
+        "image": "5b",
+        "timbreClass": 0.0,
+        "mode": 0.0,
+        "overallVolume": 44.0,
+        "tempo": 66.0,
+        "dynamicVariation": 0.0,
+        "rhythmicRegularity": 5.0
+    },
+    "15b": {
+        "image": "5c",
+        "timbreClass": 0.0,
+        "mode": 0.0,
+        "overallVolume": 44.0,
+        "tempo": 66.0,
+        "dynamicVariation": 0.0,
+        "rhythmicRegularity": 5.0
     }
 }

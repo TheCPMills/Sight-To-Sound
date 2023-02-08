@@ -11,6 +11,8 @@ import javafx.beans.property.*;
 import javafx.scene.*;
 import javafx.scene.control.*;
 import javafx.scene.control.knob.*;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.input.*;
 import javafx.scene.layout.*;
 import javafx.scene.paint.*;
@@ -21,11 +23,8 @@ import javafx.stage.*;
 
 // audio packages
 import jmusic.*;
-
 import javax.sound.midi.*;
 import javax.sound.sampled.*;
-
-import org.javatuples.Pair;
 import org.jfugue.realtime.*;
 
 // JSON packages
@@ -36,7 +35,9 @@ public class App extends Application {
     /* Main Application Components */
     private static Stage primaryStage;
     private static Scene prologueScene, questionaireScene, music2ImageTutorialScene, music2ImageScene, image2MusicTutorialScene, image2MusicScene, epilogueScene;
+    private static BufferedWriter questionaireWriter;
     private static JSONObject levelsJSONObject;
+    private static IntegerProperty currentPageProperty;
     private static int currentLevel;
     private static Random rng;
 
@@ -46,7 +47,7 @@ public class App extends Application {
     private static Button colorChooserM2I = new Button();
     private static Group paletteM2I = new Group();
     private static ObjectProperty<Color> imageColorPropertyM2I = new SimpleObjectProperty<>();
-    private static JFXButton playPauseButtonM2I = new JFXButton();
+    private static JFXButton playStopButtonM2I = new JFXButton();
     private static MacosButton submitButtonM2I = new MacosButton("Submit");
     private static SimpleAudioPlayer mediaPlayerM2I;
     private static int mediaPlayerStatusM2I = 1; // 0 = playing, 1 = paused, 2 = finished
@@ -74,21 +75,26 @@ public class App extends Application {
     private static Text dynamicVariationLabelI2M = new Text("Dynamic\nVariation");
     private static Text rhythmicRegularityLabelI2M = new Text(" Rhythmic\nRegularity");
 
-    private static Knob timbreClassKnobI2M = new Knob(0, 5, 0);
-    private static Knob modeKnobI2M = new Knob(0, 5, 0);
+    private static Knob timbreClassKnobI2M = new Knob(0, 4, 0);
+    private static Knob modeKnobI2M = new Knob(0, 3, 0);
     private static Knob volumeKnobI2M = new Knob(0, 92, 44);
     private static Knob tempoKnobI2M = new Knob(0, 175, 66);
     private static Knob dynamicVariationKnobI2M = new Knob(0, 3, 0);
-    private static Knob rhythmicRegularityKnobI2M = new Knob(0, 5, 0);
+    private static Knob rhythmicRegularityKnobI2M = new Knob(0, 5, 5);
 
     private static RealtimePlayer mediaPlayerI2M;
     private static MacosButton playButtonI2M = new MacosButton("Play");
     private static MacosButton submitButtonI2M = new MacosButton("Submit");
 
-    private static JSONObject modesJSONObjectI2M;
+    private static int keyI2M;
+    private static int[] instrumentsI2M = { 25, 40, 71, 56, 11 };
+    private static int[][] modesI2M = {{-12, -12, -10, -8, -8, -7, -7, -5, -5, -3, -1, -1, 0, 0, 2, 4, 4, 5, 5, 7, 7, 9, 11, 11, 12, 12, 14, 16, 16, 17, 17, 19},
+                                       {-12, -12, -10, -9, -9, -7, -7, -5, -5, -4, -2, -2, 0, 0, 2, 3, 3, 5, 5, 7, 7, 8, 10, 10, 12, 12, 14, 15, 15, 17, 17, 19},
+                                       {-12, -12, -9, -9, -7, -7, -5, -5, -5, -2, -2, 0, 0, 0, 3, 3, 5, 5, 7, 7, 7, 10, 10, 12, 12, 12, 15, 15, 17, 17, 19, 19},
+                                       {-12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19}};
     private static int[] pitchesI2M = new int[16];
-    private static int[] instrumentsI2M = {0, 25, 40, 71, 56, 11};
-    private static int key;
+    @SuppressWarnings("unchecked") private static LinkedList<NoteDuration>[] durationsI2M = new LinkedList[6];
+    
     private static BufferedWriter responseWriterI2M;
 
     /* Main Application Functions */
@@ -115,6 +121,9 @@ public class App extends Application {
         }
 
         try {
+            questionaireWriter = new BufferedWriter(new FileWriter(new File("assets/data/questionaire.tsv")));
+            questionaireWriter.write("Age\tGender\tEthnicity\tLocation\tMajor\tMusic Experience\tVisual Art Experience\n");
+
             responseWriterM2I = new BufferedWriter(new FileWriter(new File("assets/data/responseM2I.csv")));
             responseWriterM2I.write("Hue,Saturation,Brightness,Path,Curvature,Aspect Ratio\n");
 
@@ -124,6 +133,7 @@ public class App extends Application {
             e.printStackTrace();
         }
 
+        currentPageProperty = new SimpleIntegerProperty(0);
         currentLevel = 1;
         rng = new Random(currentLevel * 0xdeaf);
 
@@ -144,21 +154,22 @@ public class App extends Application {
     private static Scene createPrologueScene(AnchorPane root) {
         root.setPrefSize(660, 625);
 
-        Text text = new Text("This page would welcome the participant.");
-        text.setFont(Font.font("Arial", FontWeight.BOLD, 20));
+        Text text = new Text("Welcome to the Sight\nto Sound Study!");
+        text.setFont(Font.font("Arial", FontWeight.BOLD, 36));
         text.setFill(Color.BLACK);
         text.setLayoutX(100);
         text.setLayoutY(300);
 
-        MacosButton button = new MacosButton("Continue");
-        button.setLayoutX(575);
-        button.setLayoutY(575);
-        button.setOnAction(e -> {
+        MacosButton nextButton = new MacosButton("Continue");
+        nextButton.setLayoutX(575);
+        nextButton.setLayoutY(585);
+        nextButton.setOnAction(e -> {
+            currentPageProperty.set(currentPageProperty.get() + 1);
             changeScene(questionaireScene);
         });
 
         root.getChildren().add(text);
-        root.getChildren().add(button);
+        root.getChildren().add(nextButton);
 
         return new Scene(root);
     }
@@ -166,48 +177,206 @@ public class App extends Application {
     private static Scene createQuestionaireScene(AnchorPane root) {
         root.setPrefSize(660, 625);
 
-        Text text = new Text("This page would have the questionaire.");
-        text.setFont(Font.font("Arial", FontWeight.BOLD, 20));
+        Text text = new Text("Pre-Study Questionaire");
+        text.setFont(Font.font("Arial", FontWeight.BOLD, 36));
         text.setFill(Color.BLACK);
-        text.setLayoutX(100);
-        text.setLayoutY(300);
+        text.setLayoutX(120);
+        text.setLayoutY(47);
 
-        MacosButton button = new MacosButton("Continue");
-        button.setLayoutX(575);
-        button.setLayoutY(575);
-        button.setOnAction(e -> {
+        ScrollPane scrollPane = new ScrollPane();
+        scrollPane.setPrefSize(610, 500);
+        scrollPane.setLayoutX(20);
+        scrollPane.setLayoutY(66);
+
+        AnchorPane scrollPaneContent = new AnchorPane();
+        scrollPaneContent.setPrefSize(610, 1000);
+
+        Text ageText = new Text("Please Specify Your Age:");
+        ageText.setLayoutX(20);
+        ageText.setLayoutY(30);
+        TextField ageTextField = new TextField();
+        ageTextField.setLayoutX(155);
+        ageTextField.setLayoutY(15);
+        ageTextField.setPrefSize(40, 5);
+        ageTextField.setStyle("-fx-font-size: 8px;");
+
+        Text genderText = new Text("Please Specify Your Gender:");
+        genderText.setLayoutX(20);
+        genderText.setLayoutY(60);
+
+        ToggleGroup genderToggleGroup = new ToggleGroup();
+
+        RadioButton maleRadioButton = new MacosRadioButton("Male");
+        maleRadioButton.setLayoutX(20);
+        maleRadioButton.setLayoutY(70);
+        maleRadioButton.setToggleGroup(genderToggleGroup);
+
+        RadioButton femaleRadioButton = new MacosRadioButton("Female");
+        femaleRadioButton.setLayoutX(20);
+        femaleRadioButton.setLayoutY(90);
+        femaleRadioButton.setToggleGroup(genderToggleGroup);
+
+        RadioButton otherRadioButton = new MacosRadioButton("Other");
+        otherRadioButton.setLayoutX(20);
+        otherRadioButton.setLayoutY(110);
+        otherRadioButton.setToggleGroup(genderToggleGroup);
+
+        TextField otherGenderTextField = new TextField();
+        otherGenderTextField.setPrefSize(100, 5);
+        otherGenderTextField.setStyle("-fx-font-size: 8px;");
+        otherGenderTextField.setLayoutX(75);
+        otherGenderTextField.setLayoutY(110);
+        otherGenderTextField.textProperty().addListener((observable, oldValue, newValue) -> {
+            if (!newValue.isEmpty()) {
+                otherRadioButton.setSelected(true);
+            } else {
+                otherRadioButton.setSelected(false);
+            }
+        });
+
+        RadioButton preferNotToSayRadioButton = new MacosRadioButton("Prefer Not To Say");
+        preferNotToSayRadioButton.setLayoutX(20);
+        preferNotToSayRadioButton.setLayoutY(130);
+        preferNotToSayRadioButton.setToggleGroup(genderToggleGroup);
+
+        scrollPane.setContent(scrollPaneContent);
+        scrollPaneContent.getChildren().add(ageText);
+        scrollPaneContent.getChildren().add(ageTextField);
+        scrollPaneContent.getChildren().add(genderText);
+        scrollPaneContent.getChildren().add(maleRadioButton);
+        scrollPaneContent.getChildren().add(femaleRadioButton);
+        scrollPaneContent.getChildren().add(otherRadioButton);
+        scrollPaneContent.getChildren().add(preferNotToSayRadioButton);
+        scrollPaneContent.getChildren().add(otherGenderTextField);
+
+        MacosButton nextButton = new MacosButton("Continue");
+        nextButton.setLayoutX(575);
+        nextButton.setLayoutY(585);
+        nextButton.setOnAction(e -> {
+            currentPageProperty.set(currentPageProperty.get() + 1);
             changeScene(music2ImageTutorialScene);
         });
 
+        MacosButton previousButton = new MacosButton("Back");
+        previousButton.setLayoutX(25);
+        previousButton.setLayoutY(585);
+        previousButton.setOnAction(e -> {
+            currentPageProperty.set(currentPageProperty.get() - 1);
+            changeScene(prologueScene);
+        });
+
+        try {
+            questionaireWriter.write("20\tMale\tCaucasian\tEast Coast US\tComputer Science\tYes\tYes\n");
+            questionaireWriter.close();
+        } catch (IOException e1) {
+            e1.printStackTrace();
+        }
+
         root.getChildren().add(text);
-        root.getChildren().add(button);
+        root.getChildren().add(scrollPane);
+        root.getChildren().add(nextButton);
+        root.getChildren().add(previousButton);
 
         return new Scene(root);
     }
 
     private static Scene createMusic2ImageTutorialScene(AnchorPane root) {
-        root.setPrefSize(660, 625);
+        root.setPrefSize(660, 625); 
 
-        Text text = new Text("This page would guide the participant on\nhow to use the software for the first part of the study.");
-        text.setFont(Font.font("Arial", FontWeight.BOLD, 20));
-        text.setFill(Color.BLACK);
-        text.setLayoutX(100);
-        text.setLayoutY(300);
+        ImageView background = new ImageView(new Image("file:resources/tutorialM2I/Page1.png"));
+        background.setLayoutX(0);
+        background.setLayoutY(0);
 
-        MacosButton button = new MacosButton("Next");
-        button.setLayoutX(575);
-        button.setLayoutY(575);
-        button.setOnAction(e -> {
-            if (button.getText().equals("Next")) {
-                text.setText("This page would guide the participant on\nhow to use the software for the first part of the study.\n\nIf more instructions are needed, \nthey will be displayed here.");
-                button.setText("Continue");
-            } else {
-                changeScene(music2ImageScene);
+        ImageView gif = new ImageView(new Image("file:resources/tutorialM2I/anchorPoint.gif"));
+        gif.setLayoutX(201);
+        gif.setLayoutY(339.4);
+        gif.setVisible(false);
+
+        ImageView secondGif = new ImageView(new Image("file:resources/tutorialM2I/stop.gif"));
+        secondGif.setLayoutX(104);
+        secondGif.setLayoutY(442.2);
+        secondGif.setVisible(false);
+
+        MacosButton nextButton = new MacosButton("Continue");
+        nextButton.setLayoutX(575);
+        nextButton.setLayoutY(585);
+        nextButton.setOnAction(e -> {
+            currentPageProperty.set(currentPageProperty.get() + 1);
+        });
+
+        MacosButton previousButton = new MacosButton("Back");
+        previousButton.setLayoutX(25);
+        previousButton.setLayoutY(585);
+        previousButton.setOnAction(e -> {
+            currentPageProperty.set(currentPageProperty.get() - 1);
+        });
+
+        currentPageProperty.addListener((observable, oldValue, newValue) -> {
+            switch (newValue.intValue()) {
+                case 1:
+                    changeScene(questionaireScene);
+                    break;
+                case 2:
+                    background.setImage(new Image("file:resources/tutorialM2I/Page1.png"));
+                    break;
+                case 3:
+                    background.setImage(new Image("file:resources/tutorialM2I/Page2.png"));
+                    gif.setVisible(false);
+                    break;
+                case 4:
+                    background.setImage(new Image("file:resources/tutorialM2I/Page3.png"));
+                    gif.setImage(new Image("file:resources/tutorialM2I/anchorPoint.gif"));
+                    gif.setVisible(true);
+                    break;
+                case 5:
+                    background.setImage(new Image("file:resources/tutorialM2I/Page4.png"));
+                    gif.setImage(new Image("file:resources/tutorialM2I/controlPoint.gif"));
+                    gif.setLayoutX(201);
+                    gif.setLayoutY(339.4);
+                    break;
+                case 6:
+                    background.setImage(new Image("file:resources/tutorialM2I/Page5.png"));
+                    gif.setImage(new Image("file:resources/tutorialM2I/addPoint.gif"));
+                    gif.setLayoutX(113.5);
+                    gif.setLayoutY(177.4);
+                    break;
+                case 7:
+                    background.setImage(new Image("file:resources/tutorialM2I/Page6.png"));
+                    gif.setImage(new Image("file:resources/tutorialM2I/removePoint.gif"));
+                    gif.setLayoutX(104);
+                    gif.setLayoutY(159.4);
+                    break;
+                case 8:
+                    background.setImage(new Image("file:resources/tutorialM2I/Page7.png"));
+                    gif.setImage(new Image("file:resources/tutorialM2I/colorPicker.gif"));
+                    gif.setLayoutX(106.5);
+                    gif.setLayoutY(271.8);
+                    secondGif.setVisible(false);
+                    break;
+                case 9:
+                    background.setImage(new Image("file:resources/tutorialM2I/Page8.png"));
+                    gif.setVisible(true);
+                    gif.setImage(new Image("file:resources/tutorialM2I/play.gif"));
+                    gif.setLayoutX(104);
+                    gif.setLayoutY(253.2);
+                    secondGif.setVisible(true);
+                    break;
+                case 10:
+                    background.setImage(new Image("file:resources/tutorialM2I/Page9.png"));
+                    gif.setVisible(false);
+                    secondGif.setVisible(false);
+                    break;
+                case 11:
+                    changeScene(music2ImageScene);
+                    break;
             }
         });
 
-        root.getChildren().add(text);
-        root.getChildren().add(button);
+        root.getChildren().add(background);
+        root.getChildren().add(gif);
+        root.getChildren().add(secondGif);
+        root.getChildren().add(nextButton);
+        root.getChildren().add(previousButton);
 
         return new Scene(root);
     }
@@ -251,7 +420,8 @@ public class App extends Application {
         colorChooserM2I.setPrefSize(30, 30);
         colorChooserM2I.setStyle("-fx-background-radius: 15; -fx-background-color: white; -fx-border-radius: 15; -fx-border-color: black;");
         colorChooserM2I.setOnAction(e -> {
-            CustomColorPicker colorPickerM2I = new CustomColorPicker();
+            submitButtonM2I.setDisable(true);
+            CustomColorPicker colorPickerM2I = new CustomColorPicker(submitButtonM2I);
             colorPickerM2I.setCurrentColor(imageColorPropertyM2I.get());
 
             CustomMenuItem colorPickerMenuM2I = new CustomMenuItem(colorPickerM2I);
@@ -272,36 +442,33 @@ public class App extends Application {
         ((SVGPath) (paletteM2I.getChildren().get(1))).setContent("M16.395 10.375c-.676-.2-1.258-.371-1.415-.77-.093-.23-.058-.57.098-1.007C16.754 7.03 19.266 4.5 19.2 3.48c-.031-.417-.687-1-1.117-1h-.031c-.469.032-1.176.645-1.938 1.477a3.448 3.448 0 0 0-.238-.55c-.797-1.372-2.547-2.157-4.8-2.157-1.75 0-3.7.48-5.637 1.395-2.49 1.171-4.346 3.617-4.732 6.23-.289 1.938.055 4.875 3.328 7.832 1.453 1.32 3.735 2.043 6.438 2.043 2.168 0 4.359-.48 6.027-1.324 1.855-.938 2.875-2.238 2.875-3.656 0-2.52-1.719-3.024-2.98-3.395m1.687-7.426c.2 0 .637.406.648.563.055.863-3.043 3.945-5.117 5.785l-.351-.309-.23-.195c1.542-2.305 4.175-5.79 5.05-5.844M12.27 9.707l.48-.547.535.477-.473.539-.542-.469m3.945 7.164c-1.578.797-3.668 1.254-5.742 1.254-2.547 0-4.68-.668-6.016-1.875-3.07-2.781-3.398-5.496-3.133-7.281.36-2.41 2.078-4.672 4.38-5.762 1.855-.875 3.714-1.332 5.37-1.332 2 0 3.586.688 4.258 1.844.148.25.242.515.297.793-1.399 1.656-2.816 3.77-3.094 4.176l-.867.996c-.453-.008-.906.191-1.055.671-.515 1.77-1.664 2.864-1.664 2.864s2.922-.574 3.477-1.235a1.79 1.79 0 0 0 .449-1.168l.906-1.039.531-.468c-.003.191.02.367.083.53.277.68 1.03.9 1.824 1.134 1.246.367 2.531.746 2.531 2.797 0 1.171-.902 2.273-2.535 3.101");
         ((SVGPath) (paletteM2I.getChildren().get(2))).setContent("M16.918 12.438c-.93-.739-2.422-.739-3.344 0-.922.738-.922 1.937 0 2.675.922.742 2.414.742 3.344 0 .914-.738.914-1.937 0-2.675m-.461 2.312c-.664.543-1.758.543-2.426 0-.676-.535-.676-1.406 0-1.95.668-.534 1.762-.534 2.426 0 .672.544.672 1.415 0 1.95");
 
-        playPauseButtonM2I.setLayoutX(189.8);
-        playPauseButtonM2I.setLayoutY(543.5);
-        playPauseButtonM2I.setPrefSize(30, 30);
-        playPauseButtonM2I.setStyle("-fx-background-color: black; -fx-shape: \"M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm-3 18v-12l10 6-10 6z\";");
+        playStopButtonM2I.setLayoutX(189.8);
+        playStopButtonM2I.setLayoutY(543.5);
+        playStopButtonM2I.setPrefSize(30, 30);
+        playStopButtonM2I.setStyle("-fx-background-color: black; -fx-shape: \"M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm-3 18v-12l10 6-10 6z\";");
         Circle playPauseButtonBackground = new Circle(204.8, 558.5, 15, Color.WHITE);
-        playPauseButtonM2I.setOnAction(e -> {
+        playStopButtonM2I.setOnAction(e -> {
             switch (mediaPlayerStatusM2I) {
                 case 0:
-                    mediaPlayerM2I.pause();
+                    try {
+                        mediaPlayerM2I.stop();
+                        playheadM2I.setValue(0);
+                        playheadTextM2I.setText("0:00");
+                    } catch (UnsupportedAudioFileException | IOException | LineUnavailableException e1) {
+                    }
                     mediaPlayerStatusM2I = 1;
-                    playPauseButtonM2I.setStyle("-fx-background-color: black; -fx-shape: \"M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm-3 18v-12l10 6-10 6z\";");
+                    playStopButtonM2I.setStyle("-fx-background-color: black; -fx-shape: \"M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm-3 18v-12l10 6-10 6z\";");
                     break;
                 case 1:
                     try {
-                        mediaPlayerM2I.resume();
-                    } catch (UnsupportedAudioFileException | IOException | LineUnavailableException ex) {
+                        mediaPlayerM2I.restart();
+                        mediaPlayerM2I.loop();
+                    } catch (IOException | LineUnavailableException | UnsupportedAudioFileException e1) {
                     }
                     mediaPlayerStatusM2I = 0;
-                    playPauseButtonM2I.setStyle("-fx-background-color: black; -fx-shape: \"M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm-1 17h-3v-10h3v10zm5 0h-3v-10h3v10z\";");
+                    playStopButtonM2I.setStyle("-fx-background-color: black; -fx-shape: \"M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm-1 17h-3v-10h3v10zm5 0h-3v-10h3v10z\";");
                     break;
-                case 2:
-                    try {
-                        mediaPlayerM2I.restart();
-                        mediaPlayerM2I.play();
-                        mediaPlayerStatusM2I = 0;
-                        playPauseButtonM2I.setStyle("-fx-background-color: black; -fx-shape: \"M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm-1 17h-3v-10h3v10zm5 0h-3v-10h3v10z\";");
-                    } catch (IOException | LineUnavailableException | UnsupportedAudioFileException ex) {
-                    }
-                    break;
-            }
+                }
         });
         
         Rectangle greySquare = new Rectangle(412, 550, 35, 10);
@@ -340,14 +507,26 @@ public class App extends Application {
         submitButtonM2I.setLayoutY(590);
         submitButtonM2I.setPrefSize(100, 30);
         submitButtonM2I.setOnAction(e -> {
+            currentLevel++;
             try {
-                gatherResponseM2I();
-                responseWriterM2I.close();
-            } catch (IOException e1) {
+                mediaPlayerM2I.stop();
+            } catch (UnsupportedAudioFileException | IOException | LineUnavailableException e1) {
                 e1.printStackTrace();
             }
-
-            changeScene(image2MusicTutorialScene);
+            if (currentLevel == 16) {
+                currentLevel = 1;
+                try {
+                    gatherResponseM2I();
+                    responseWriterM2I.close();
+                } catch (IOException e1) {
+                    e1.printStackTrace();
+                }
+                currentPageProperty.set(currentPageProperty.get() + 1);
+                changeScene(image2MusicTutorialScene);
+            } else {
+                gatherResponseM2I();
+                setLevelM2I(currentLevel);
+            }
         });
 
         root.getChildren().add(titleLabelM2I);
@@ -355,7 +534,7 @@ public class App extends Application {
         root.getChildren().add(splineGroupM2I);
         root.getChildren().add(audioPlayerBoxM2I);
         root.getChildren().add(playPauseButtonBackground);
-        root.getChildren().add(playPauseButtonM2I);
+        root.getChildren().add(playStopButtonM2I);
         root.getChildren().add(playheadM2I);
         root.getChildren().add(greySquare);
         root.getChildren().add(playheadTextM2I);
@@ -372,27 +551,71 @@ public class App extends Application {
     private static Scene createImage2MusicTutorialScene(AnchorPane root) {
         root.setPrefSize(660, 625);
 
-        Text text = new Text("This page would guide the participant on\nhow to use the software for the second part of the study.");
-        text.setFont(Font.font("Arial", FontWeight.BOLD, 20));
-        text.setFill(Color.BLACK);
-        text.setLayoutX(100);
-        text.setLayoutY(300);
+        ImageView background = new ImageView(new Image("file:resources/tutorialI2M/Page1.png"));
+        background.setLayoutX(0);
+        background.setLayoutY(0);
 
-        MacosButton button = new MacosButton("Next");
-        button.setLayoutX(575);
-        button.setLayoutY(575);
-        button.setOnAction(e -> {
-            if (button.getText().equals("Next")) {
-                text.setText("This page would guide the participant on\nhow to use the software for the second part of the study.\n\nIf more instructions are needed, \nthey will be displayed here.");
-                button.setText("Continue");
-            } else {
-                setLevelI2M(1);
-                changeScene(image2MusicScene);
+        ImageView gif = new ImageView(new Image("file:resources/tutorialI2M/knob.gif"));
+        gif.setLayoutX(180);
+        gif.setLayoutY(338.9);
+        gif.setVisible(false);
+
+        MacosButton nextButton = new MacosButton("Continue");
+        nextButton.setLayoutX(575);
+        nextButton.setLayoutY(585);
+
+        MacosButton previousButton = new MacosButton("Back");
+        previousButton.setLayoutX(25);
+        previousButton.setLayoutY(585);
+        previousButton.setVisible(false);
+
+        nextButton.setOnAction(e -> {
+            currentPageProperty.set(currentPageProperty.get() + 1);
+        });
+        
+        previousButton.setOnAction(e -> {
+            currentPageProperty.set(currentPageProperty.get() - 1);
+        });
+
+        currentPageProperty.addListener((observable, oldValue, newValue) -> {
+            switch (newValue.intValue()) {
+                case 12:
+                    background.setImage(new Image("file:resources/tutorialI2M/Page1.png"));
+                    previousButton.setVisible(false);
+                    break;
+                case 13:
+                    background.setImage(new Image("file:resources/tutorialI2M/Page2.png"));
+                    previousButton.setVisible(true);
+                    gif.setVisible(false);
+                    break;
+                case 14:
+                    background.setImage(new Image("file:resources/tutorialI2M/Page3.png"));
+                    gif.setImage(new Image("file:resources/tutorialI2M/knob.gif"));
+                    gif.setLayoutX(180);
+                    gif.setLayoutY(338.9);
+                    gif.setVisible(true);
+                    break;
+                case 15:
+                    background.setImage(new Image("file:resources/tutorialI2M/Page4.png"));
+                    gif.setImage(new Image("file:resources/tutorialI2M/play.gif"));
+                    gif.setLayoutX(130);
+                    gif.setLayoutY(189);
+                    gif.setVisible(true);
+                    break;
+                case 16:
+                    background.setImage(new Image("file:resources/tutorialI2M/Page5.png"));
+                    gif.setVisible(false);
+                    break;
+                case 17:
+                    changeScene(image2MusicScene);
+                    break;
             }
         });
 
-        root.getChildren().add(text);
-        root.getChildren().add(button);
+        root.getChildren().add(background);
+        root.getChildren().add(gif);
+        root.getChildren().add(nextButton);
+        root.getChildren().add(previousButton);
 
         return new Scene(root);
     }
@@ -405,7 +628,7 @@ public class App extends Application {
         titleLabelI2M.setStyle("-fx-font-size: 18px;");
        
         imageI2M.setLayoutX(0);
-        imageI2M.setLayoutY(0);
+        imageI2M.setLayoutY(50);
         imageI2M.setStrokeWidth(2);
         imageI2M.setStroke(Color.BLACK);
         imageI2M.setFill(Color.WHITE);
@@ -471,11 +694,6 @@ public class App extends Application {
             rhythmicRegularityKnobI2M.setValue(Math.round(newValue.doubleValue()));
         });
 
-        try {
-            mediaPlayerI2M = new RealtimePlayer();
-        } catch (MidiUnavailableException e) {
-        }
-
         playButtonI2M.setLayoutX(280);
         playButtonI2M.setLayoutY(540);
         playButtonI2M.setPrefSize(100, 30);
@@ -483,40 +701,65 @@ public class App extends Application {
             playButtonI2M.setText("Playing...");
             playButtonI2M.setDisable(true);
             submitButtonI2M.setDisable(true);
-            timbreClassKnobI2M.setDisable(true);
-            modeKnobI2M.setDisable(true);
-            volumeKnobI2M.setDisable(true);
-            tempoKnobI2M.setDisable(true);
-            dynamicVariationKnobI2M.setDisable(true);
-            rhythmicRegularityKnobI2M.setDisable(true);
         });
         playButtonI2M.disableProperty().addListener((observable, oldValue, newValue) -> {
             if (newValue) {
-                Pair<String, Double> song = generateMusicI2M();
-                String pattern = song.getValue0();
-                double length = song.getValue1().doubleValue() * 240000;
+                try {
+                    mediaPlayerI2M = new RealtimePlayer();
+                } catch (MidiUnavailableException e) {
+                }
 
-                mediaPlayerI2M.play(pattern);
+                // create a new thread to play the music
+                Thread musicThread = new Thread(() -> {
+                    for (int i = 0; i < 16; i++) {
+                        // get timbre class
+                        int instrument = instrumentsI2M[(int) timbreClassKnobI2M.getValue()];
+                        
+                        // get mode
+                        int[] scale = modesI2M[(int) modeKnobI2M.getValue()];
 
-                Thread t = new Thread(() -> {
-                    try {
+                        // get pitch
+                        int pitch = scale[pitchesI2M[i]] + keyI2M;
+
+                        // get velocity
+                        int velocity = (int) (volumeKnobI2M.getValue() + 20);
+                        int dynamicVariation = getDynamicVariationModifierI2M((int) dynamicVariationKnobI2M.getValue());
+                        velocity = Math.min(112, Math.max(20, velocity + 13 * dynamicVariation));
+
+                        // get duration
+                        float duration = durationsI2M[(int) rhythmicRegularityKnobI2M.getValue()].get(i).getDuration();
+
+                        // get tempo
                         int tempo = (int) tempoKnobI2M.getValue() + 25;
-                        Thread.sleep((long) (length / tempo));
+
+                        // play note
+                        mediaPlayerI2M.play("T" + tempo + " &V0,L0,I" + instrument + "," + pitch + "/" + duration + "a" + velocity);
+
+                        // create thread to sleep for duration
+                        try {
+                            Thread.sleep((long) (duration * 240000 / tempo));
+                        } catch (InterruptedException e1) {
+                        }
+                    }
+                });
+                
+                // create thread to wait for music to finish
+                Thread waitThread = new Thread(() -> {
+                    try {
+                        musicThread.join();
                         Platform.runLater(() -> {
                             playButtonI2M.setText("Play");
                             playButtonI2M.setDisable(false);
                             submitButtonI2M.setDisable(false);
-                            timbreClassKnobI2M.setDisable(false);
-                            modeKnobI2M.setDisable(false);
-                            volumeKnobI2M.setDisable(false);
-                            tempoKnobI2M.setDisable(false);
-                            dynamicVariationKnobI2M.setDisable(false);
-                            rhythmicRegularityKnobI2M.setDisable(false);
+                            mediaPlayerI2M.close();
                         });
-                    } catch (InterruptedException ex1) {
+                    } catch (InterruptedException e1) {
                     }
                 });
-                t.start();
+
+                // start threads
+                musicThread.start();
+                waitThread.start();
             }
         });
 
@@ -524,28 +767,22 @@ public class App extends Application {
         submitButtonI2M.setLayoutY(575);
         submitButtonI2M.setPrefSize(100, 30);
         submitButtonI2M.setOnAction(e -> {
-            try {
+            currentLevel++;
+            if (currentLevel == 16) {
+                currentLevel = 1;
+                try {
+                    gatherResponseI2M();
+                    responseWriterI2M.close();
+                } catch (IOException e1) {
+                    e1.printStackTrace();
+                }
+                currentPageProperty.set(currentPageProperty.get() + 1);
+                changeScene(epilogueScene);
+            } else {
                 gatherResponseI2M();
-                responseWriterI2M.close();
-            } catch (IOException e1) {
-                e1.printStackTrace();
+                setLevelI2M(currentLevel);
             }
-
-            changeScene(epilogueScene);
         });
-
-        JSONParser parser = new JSONParser();
-        try {
-            modesJSONObjectI2M = (JSONObject) parser.parse(new FileReader("resources/modes.json"));
-        } catch (IOException e) {
-            System.out.println("Error: Could not load modes.json file.");
-            System.exit(1);
-            return null;
-        } catch (ParseException e) {
-            System.out.println("Error: Could not parse modes.json file.");
-            System.exit(1);
-            return null;
-        }
 
         setLevelI2M(1);
 
@@ -572,8 +809,8 @@ public class App extends Application {
     private static Scene createEpilogueScene(AnchorPane root) {
         root.setPrefSize(660, 625);
 
-        Text text = new Text("This page would thank the participant.");
-        text.setFont(Font.font("Arial", FontWeight.BOLD, 20));
+        Text text = new Text("Thank you for participating\nin our study!");
+        text.setFont(Font.font("Arial", FontWeight.BOLD, 36));
         text.setFill(Color.BLACK);
         text.setLayoutX(100);
         text.setLayoutY(300);
@@ -595,6 +832,7 @@ public class App extends Application {
     private static void changeScene(Scene scene) {
         primaryStage.setScene(scene);
     }
+
 
     /* Music to Image Functions and Structures */
     private static CurveInfo createCurve(Anchor startPoint, Anchor endPoint) {
@@ -788,6 +1026,10 @@ public class App extends Application {
         initializeCurves();
         colorChooserM2I.setStyle("-fx-background-radius: 15; -fx-background-color: white; -fx-border-radius: 15; -fx-border-color: black;");
         imageColorPropertyM2I.setValue(Color.WHITE);
+        // if the music is playing, stop it
+        if (mediaPlayerStatusM2I == 0) {
+            playStopButtonM2I.fire();
+        }
     }
 
     private static String getPath() {
@@ -823,7 +1065,7 @@ public class App extends Application {
     private static void gatherResponseM2I() {
         try {
             Color color = imageColorPropertyM2I.getValue();
-            responseWriterM2I.write(color.getHue() + "," + color.getSaturation() + "," + color.getBrightness() + "," + getPath() + "," + "TBD" + "," + "TBD");
+            responseWriterM2I.write(color.getHue() + "," + color.getSaturation() + "," + color.getBrightness() + "," + getPath() + "," + "TBD" + "," + "TBD\n");
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -991,6 +1233,11 @@ public class App extends Application {
         public void play() {
             clip.start();
         }
+
+        public void loop() {
+            clip.loop(Clip.LOOP_CONTINUOUSLY);
+            clip.start();
+        }
         
         public void pause() {
             this.currentFrame = this.clip.getMicrosecondPosition();
@@ -1003,12 +1250,10 @@ public class App extends Application {
         }
         
         public void restart() throws IOException, LineUnavailableException, UnsupportedAudioFileException {
-            clip.stop();
-            clip.close();
+            stop();
             resetAudioStream();
             currentFrame = 0L;
             clip.setMicrosecondPosition(0);
-            this.play();
         }
         
         public void stop() throws UnsupportedAudioFileException, IOException, LineUnavailableException {
@@ -1037,13 +1282,17 @@ public class App extends Application {
         }
 
         public void addChangeListener() {
+            long clipLength = clip.getMicrosecondLength() / 1000000;
+            long clipLengthHalfSeconds = clip.getMicrosecondLength() / 500000;
+
+
             clip.addLineListener(event -> {
                 long lastSecond = 0L;
                 long lastHalfSecond = 0L;
                 if (event.getType() == LineEvent.Type.START) {
                     while (!isFinished()) {
-                        long currentSecond = clip.getMicrosecondPosition() / 1000000;
-                        long currentHalfSecond = clip.getMicrosecondPosition() / 500000;
+                        long currentSecond = (clip.getMicrosecondPosition() / 1000000) % clipLength;
+                        long currentHalfSecond = (clip.getMicrosecondPosition() / 500000) % clipLengthHalfSeconds;
 
                         if (currentHalfSecond != lastHalfSecond) {
                             lastHalfSecond = currentHalfSecond;
@@ -1062,14 +1311,7 @@ public class App extends Application {
                             }
                         }
                     }
-                } else if (event.getType() == LineEvent.Type.STOP) {
-                    if (isFinished()) {
-                        playPauseButtonM2I.setStyle("-fx-background-color: black; -fx-shape: \"M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm-3 18v-12l10 6-10 6z\";");
-                        playheadM2I.setValue(0);
-                        playheadTextM2I.setText("0:00");
-                        mediaPlayerStatusM2I = 2;
-                    }
-                } 
+                }
             });
         }
     }
@@ -1082,45 +1324,13 @@ public class App extends Application {
             pitchesI2M[i] = pitches.get(i);
         }
 
-        key = rng.nextInt(-4, 8) + 60;
+        keyI2M = rng.nextInt(-4, 8) + 60;
+        for (int i = 0; i < durationsI2M.length; i++) {
+            durationsI2M[i] = getDurations(i);
+        }
 
         imageI2M.setContent(SVGReader.getSVGPath(fileName));
         imageI2M.setFill(SVGReader.getSVGFill(fileName));
-    }
-
-    private static Pair<String, Double> generateMusicI2M() {
-        JSONObject modeJSONObject = (JSONObject) modesJSONObjectI2M.get(getModeNameI2M());
-        JSONArray scaleJSONArray = (JSONArray) modeJSONObject.get("scale");
-
-        int[] scale = new int[scaleJSONArray.size()];
-        for (int i = 0; i < scaleJSONArray.size(); i++) {
-            scale[i] = Integer.parseInt(scaleJSONArray.get(i).toString());
-        }
-
-        LinkedList<NoteDuration> noteDurations = getDurations((int) rhythmicRegularityKnobI2M.getValue());
-        double totalDuration = 0;
-        for (NoteDuration noteDuration : noteDurations) {
-            totalDuration += noteDuration.getDuration();
-        }
-
-        LinkedList<Note> notes = new LinkedList<>();
-        for (int i = 0; i < pitchesI2M.length; i++) {
-            int pitch = scale[pitchesI2M[i]] + key;
-    
-            int velocity = (int) (volumeKnobI2M.getValue() + 20);
-            int dynamicVariation = getDynamicVariationModifierI2M((int) dynamicVariationKnobI2M.getValue());
-            velocity = Math.min(112, Math.max(20, velocity + 13 * dynamicVariation));
-
-            float duration = noteDurations.get(i).getDuration();
-
-            notes.add(new Note(pitch, velocity, duration));
-        }
-
-        Voice melody = new Voice(0, instrumentsI2M[(int) timbreClassKnobI2M.getValue()], (int) tempoKnobI2M.getValue() + 25);
-        for (Note note : notes) {
-            melody.addNote(note);
-        }
-        return new Pair<>("T" + ((int) tempoKnobI2M.getValue() + 25) + " " + melody.toString(), totalDuration);
     }
 
     private static int getDynamicVariationModifierI2M(int level) {
@@ -1177,44 +1387,37 @@ public class App extends Application {
             case 0:
                 durations = new LinkedList<>() {
                     {
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.QUAVER);
+                        add(NoteDuration.QUAVER);
+                        add(NoteDuration.QUAVER);
                         add(NoteDuration.CROTCHET);
-                        add(NoteDuration.CROTCHET);
-                        add(NoteDuration.CROTCHET);
-                        add(NoteDuration.CROTCHET);
-                        add(NoteDuration.CROTCHET);
-                        add(NoteDuration.CROTCHET);
-                        add(NoteDuration.CROTCHET);
-                        add(NoteDuration.CROTCHET);
-                        add(NoteDuration.CROTCHET);
-                        add(NoteDuration.CROTCHET);
-                        add(NoteDuration.CROTCHET);
-                        add(NoteDuration.CROTCHET);
-                        add(NoteDuration.CROTCHET);
-                        add(NoteDuration.CROTCHET);
-                        add(NoteDuration.CROTCHET);
-                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.MINIM);
                     }
                 };
                 break;
             case 1:
                 durations = new LinkedList<>() {
                     {
-                        add(NoteDuration.QUAVER);
-                        add(NoteDuration.QUAVER);
-                        add(NoteDuration.QUAVER);
-                        add(NoteDuration.QUAVER);
-                        add(NoteDuration.QUAVER);
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.SEMIQUAVER);
                         add(NoteDuration.QUAVER);
                         add(NoteDuration.QUAVER);
                         add(NoteDuration.QUAVER);
                         add(NoteDuration.CROTCHET);
                         add(NoteDuration.CROTCHET);
-                        add(NoteDuration.CROTCHET);
-                        add(NoteDuration.CROTCHET);
-                        add(NoteDuration.CROTCHET);
-                        add(NoteDuration.CROTCHET);
-                        add(NoteDuration.CROTCHET);
-                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.MINIM);
+                        add(NoteDuration.MINIM);
+                        add(NoteDuration.MINIM);
                     }
                 };
                 break;
@@ -1225,9 +1428,6 @@ public class App extends Application {
                         add(NoteDuration.SEMIQUAVER);
                         add(NoteDuration.SEMIQUAVER);
                         add(NoteDuration.SEMIQUAVER);
-                        add(NoteDuration.SEMIQUAVER);
-                        add(NoteDuration.SEMIQUAVER);
-                        add(NoteDuration.QUAVER);
                         add(NoteDuration.QUAVER);
                         add(NoteDuration.QUAVER);
                         add(NoteDuration.QUAVER);
@@ -1237,6 +1437,9 @@ public class App extends Application {
                         add(NoteDuration.CROTCHET);
                         add(NoteDuration.CROTCHET);
                         add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.MINIM);
+                        add(NoteDuration.MINIM);
                     }
                 };
                 break;
@@ -1247,6 +1450,9 @@ public class App extends Application {
                         add(NoteDuration.SEMIQUAVER);
                         add(NoteDuration.SEMIQUAVER);
                         add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.QUAVER);
                         add(NoteDuration.QUAVER);
                         add(NoteDuration.QUAVER);
                         add(NoteDuration.QUAVER);
@@ -1256,63 +1462,60 @@ public class App extends Application {
                         add(NoteDuration.CROTCHET);
                         add(NoteDuration.CROTCHET);
                         add(NoteDuration.CROTCHET);
-                        add(NoteDuration.CROTCHET);
-                        add(NoteDuration.MINIM);
-                        add(NoteDuration.MINIM);
                     }
                 };
                 break;
             case 4:
                 durations = new LinkedList<>() {
                     {
-                        add(NoteDuration.SEMIQUAVER);
-                        add(NoteDuration.SEMIQUAVER);
-                        add(NoteDuration.SEMIQUAVER);
-                        add(NoteDuration.SEMIQUAVER);
-                        add(NoteDuration.SEMIQUAVER);
-                        add(NoteDuration.SEMIQUAVER);
+                        add(NoteDuration.QUAVER);
+                        add(NoteDuration.QUAVER);
+                        add(NoteDuration.QUAVER);
+                        add(NoteDuration.QUAVER);
+                        add(NoteDuration.QUAVER);
                         add(NoteDuration.QUAVER);
                         add(NoteDuration.QUAVER);
                         add(NoteDuration.QUAVER);
                         add(NoteDuration.CROTCHET);
                         add(NoteDuration.CROTCHET);
-                        add(NoteDuration.MINIM);
-                        add(NoteDuration.MINIM);
-                        add(NoteDuration.MINIM);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
                     }
                 };
                 break;
             case 5:
                 durations = new LinkedList<>() {
                     {
-                        add(NoteDuration.SEMIQUAVER);
-                        add(NoteDuration.SEMIQUAVER);
-                        add(NoteDuration.SEMIQUAVER);
-                        add(NoteDuration.SEMIQUAVER);
-                        add(NoteDuration.SEMIQUAVER);
-                        add(NoteDuration.SEMIQUAVER);
-                        add(NoteDuration.QUAVER);
-                        add(NoteDuration.QUAVER);
-                        add(NoteDuration.QUAVER);
                         add(NoteDuration.CROTCHET);
-                        add(NoteDuration.MINIM);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
+                        add(NoteDuration.CROTCHET);
                     }
                 };
                 break;
-
         }
 
         // Shuffle the list
         Random tempRNG = new Random(currentLevel);
         Collections.shuffle(durations, tempRNG);
 
-
-        if (level == 4) {
-            int index = rng.nextInt(0, 13);
-            durations.add(index, NoteDuration.CROCHET_TRIPLET);
-            durations.add(index, NoteDuration.QUAVER_TRIPLET);
-
-        } else if (level == 5) {
+        if (level == 0) {
             int index = rng.nextInt(0, 9);
             durations.add(index, NoteDuration.QUAVER_TRIPLET);
             durations.add(index, NoteDuration.CROCHET_TRIPLET);
@@ -1320,6 +1523,10 @@ public class App extends Application {
             durations.add(index, NoteDuration.CROCHET_TRIPLET);
             durations.add(index, NoteDuration.CROCHET_TRIPLET);
             durations.add(index, NoteDuration.MINIM_TRIPLET);
+        } else if (level == 1) {
+            int index = rng.nextInt(0, 13);
+            durations.add(index, NoteDuration.CROCHET_TRIPLET);
+            durations.add(index, NoteDuration.QUAVER_TRIPLET);
         }
 
         return durations;
@@ -1327,7 +1534,7 @@ public class App extends Application {
 
     private static void gatherResponseI2M() {
         try {
-            responseWriterI2M.write(getTimbreNameI2M() + "," + getModeNameI2M() + "," + getDynamicNameI2M() + "," + getTempoNameI2M() + "," + (int) dynamicVariationKnobI2M.getValue() + "," + (int) rhythmicRegularityKnobI2M.getValue());
+            responseWriterI2M.write(getTimbreNameI2M() + "," + getModeNameI2M() + "," + getDynamicNameI2M() + "," + getTempoNameI2M() + "," + (int) dynamicVariationKnobI2M.getValue() + "," + (int) rhythmicRegularityKnobI2M.getValue() + "\n");
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -1349,16 +1556,14 @@ public class App extends Application {
    private static String getTimbreNameI2M() {
 		switch ((int) timbreClassKnobI2M.getValue()) {
 			case 0:
-				return "Keyboard";
-			case 1:
 				return "Plucked Strings";
-			case 2:
+			case 1:
 				return "Bowed Strings";
-			case 3:
+			case 2:
 				return "Woodwind";
-			case 4:
+			case 3:
 				return "Brass";
-			case 5:
+			case 4:
 				return "Chromatic Percussion";
 			default:
 				return null;
@@ -1372,12 +1577,8 @@ public class App extends Application {
             case 1:
                 return "Natural Minor";
             case 2:
-                return "Major Pentatonic";
-            case 3:
                 return "Minor Pentatonic";
-            case 4:
-                return "Whole Tone";
-            case 5:
+            case 3:
                 return "Chromatic";
             default:
                 return null;
@@ -1386,22 +1587,12 @@ public class App extends Application {
 
     private static String getDynamicNameI2M() {
         int dynamic = (int) volumeKnobI2M.getValue() + 20;
-        if (20 <= dynamic && dynamic < 28) {
-            return "Pianississimo";
-        } else if (28 <= dynamic && dynamic < 40) {
-            return "Pianissimo";
-        } else if (40 <= dynamic && dynamic < 53) {
-            return "Piano";
-        } else if (53 <= dynamic && dynamic < 66) {
-            return "Mezzo Piano";
-        } else if (66 <= dynamic && dynamic < 79) {
-            return "Mezzo Forte";
-        } else if (79 <= dynamic && dynamic < 92) {
-            return "Forte";
-        } else if (92 <= dynamic && dynamic < 104) {
-            return "Fortissimo";
-        } else if (104 <= dynamic && dynamic <= 112) {
-            return "Fortississimo";
+        if (20 <= dynamic && dynamic < 50) {
+            return "Quiet";
+        } else if (50 <= dynamic && dynamic < 82) {
+            return "Medium";
+        } else if (82 <= dynamic && dynamic <= 112) {
+            return "Loud";
         } else {
             return null;
         }
