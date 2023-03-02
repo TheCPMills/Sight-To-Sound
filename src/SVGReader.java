@@ -60,15 +60,18 @@ public class SVGReader {
             e.printStackTrace();
         }
 
-        int index = line.indexOf("fill:rgb(");
+        int index = line.indexOf("fill:hsl(");
         String color = line.substring(index + 9);
-        int red = Integer.parseInt(color.substring(0, color.indexOf(",")));
-        color = color.substring(color.indexOf(",") + 1);
-        int green = Integer.parseInt(color.substring(0, color.indexOf(",")));
-        color = color.substring(color.indexOf(",") + 1);
-        int blue = Integer.parseInt(color.substring(0, color.indexOf(")")));
+        int hue = Integer.parseInt(color.substring(0, color.indexOf(",")));
+        color = color.substring(color.indexOf(",") + 2);
+        double saturation = Double.parseDouble(color.substring(0, color.indexOf("%"))) / 100.0;
+        color = color.substring(color.indexOf(",") + 2);
+        double lightness = Double.parseDouble(color.substring(0, color.indexOf("%"))) / 100.0;
 
-        return Color.rgb(red, green, blue);
+        double value = saturation * Math.min(lightness, 1 - lightness) + lightness;
+        saturation = (value == 0) ? 0 : 2 * (1 - lightness / value);
+
+        return Color.hsb(hue, saturation, value);
     }
 
     private static LinkedList<Point2d> getPoints(String fileName) {

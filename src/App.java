@@ -1,13 +1,16 @@
 // basic packages
 import java.io.*;
 import java.util.*;
+import java.util.regex.*;
 import javax.vecmath.*;
+import util.Date;
 
 // JavaFX packages
 import com.jfoenix.controls.*;
 import eu.hansolo.applefx.*;
 import javafx.application.*;
 import javafx.beans.property.*;
+import javafx.geometry.Pos;
 import javafx.scene.*;
 import javafx.scene.control.*;
 import javafx.scene.control.knob.*;
@@ -33,13 +36,16 @@ import org.json.simple.parser.*;
 
 public class App extends Application {
     /* Main Application Components */
+    private static String uuid;
     private static Stage primaryStage;
-    private static Scene prologueScene, questionaireScene, music2ImageTutorialScene, music2ImageScene, image2MusicTutorialScene, image2MusicScene, epilogueScene;
-    private static BufferedWriter questionaireWriter;
+    private static Scene prologueScene, music2ImageTutorialScene, music2ImageScene, responseConfidenceSceneM2I, image2MusicTutorialScene, image2MusicScene, responseConfidenceSceneI2M, epilogueScene;
     private static JSONObject levelsJSONObject;
     private static IntegerProperty currentPageProperty;
     private static int currentLevel;
+    private static String levelParametersM2I, levelParametersI2M;
     private static Random rng;
+
+    private static Date timestamp;
 
     /* Music to Image Components */
     private static MacosLabel titleLabelM2I = new MacosLabel("Adjust the visual appearence of the image below to match the musical piece.");
@@ -65,46 +71,46 @@ public class App extends Application {
     private static BufferedWriter responseWriterM2I;
 
     /* Image to Music Components */
-    private static MacosLabel titleLabelI2M = new MacosLabel("Adjust the musical parameters to match the image below.");
+    private static Label titleLabelI2M = new MacosLabel("Adjust the musical parameters to match the image below.");
     private static SVGPath imageI2M = new SVGPath();
 
     private static Text timbreClassLabelI2M = new Text("Timbre");
     private static Text modeLabelI2M = new Text("Mode");
     private static Text volumeLabelI2M = new Text("Volume");
-    private static Text tempoLabelI2M = new Text("Tempo");
+    private static Text tempoLabelI2M = new Text(" Tempo");
     private static Text dynamicVariationLabelI2M = new Text("Dynamic\nVariation");
     private static Text rhythmicRegularityLabelI2M = new Text(" Rhythmic\nRegularity");
 
     private static Knob timbreClassKnobI2M = new Knob(0, 4, 0);
     private static Knob modeKnobI2M = new Knob(0, 3, 0);
     private static Knob volumeKnobI2M = new Knob(0, 92, 44);
-    private static Knob tempoKnobI2M = new Knob(0, 175, 66);
+    private static Knob tempoKnobI2M = new Knob(0, 180, 80);
     private static Knob dynamicVariationKnobI2M = new Knob(0, 3, 0);
     private static Knob rhythmicRegularityKnobI2M = new Knob(0, 5, 5);
 
     private static RealtimePlayer mediaPlayerI2M;
-    private static MacosButton playButtonI2M = new MacosButton("Play");
-    private static MacosButton submitButtonI2M = new MacosButton("Submit");
+    private static Button playButtonI2M = new MacosButton("Play");
+    private static Button submitButtonI2M = new MacosButton("Submit");
 
     private static int keyI2M;
-    private static int[] instrumentsI2M = { 25, 40, 71, 56, 11 };
+    private static int[] instrumentsI2M = {25, 40, 71, 56, 11};
     private static int[][] modesI2M = {{-12, -12, -10, -8, -8, -7, -7, -5, -5, -3, -1, -1, 0, 0, 2, 4, 4, 5, 5, 7, 7, 9, 11, 11, 12, 12, 14, 16, 16, 17, 17, 19},
                                        {-12, -12, -10, -9, -9, -7, -7, -5, -5, -4, -2, -2, 0, 0, 2, 3, 3, 5, 5, 7, 7, 8, 10, 10, 12, 12, 14, 15, 15, 17, 17, 19},
                                        {-12, -12, -9, -9, -7, -7, -5, -5, -5, -2, -2, 0, 0, 0, 3, 3, 5, 5, 7, 7, 7, 10, 10, 12, 12, 12, 15, 15, 17, 17, 19, 19},
                                        {-12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19}};
     private static int[] pitchesI2M = new int[16];
     @SuppressWarnings("unchecked") private static LinkedList<NoteDuration>[] durationsI2M = new LinkedList[6];
-    
     private static BufferedWriter responseWriterI2M;
 
     /* Main Application Functions */
-    @Override public void start(Stage stage) {
+    @Override public void start(Stage stage) throws UnsupportedAudioFileException, IOException, LineUnavailableException {
         AnchorPane prologueRoot = new AnchorPane();
-        AnchorPane questionaireRoot = new AnchorPane();
         AnchorPane music2ImageTutorialRoot = new AnchorPane();
         AnchorPane music2ImageRoot = new AnchorPane();
+        AnchorPane responseConfidenceRootM2I = new AnchorPane();
         AnchorPane image2MusicTutorialRoot = new AnchorPane();
         AnchorPane image2MusicRoot = new AnchorPane();
+        AnchorPane responseConfidenceRootI2M = new AnchorPane();
         AnchorPane epilogueRoot = new AnchorPane();
 
         JSONParser parser = new JSONParser();
@@ -121,14 +127,8 @@ public class App extends Application {
         }
 
         try {
-            questionaireWriter = new BufferedWriter(new FileWriter(new File("assets/data/questionaire.tsv")));
-            questionaireWriter.write("Age\tGender\tEthnicity\tLocation\tMajor\tMusic Experience\tVisual Art Experience\n");
-
-            responseWriterM2I = new BufferedWriter(new FileWriter(new File("assets/data/responseM2I.csv")));
-            responseWriterM2I.write("Hue,Saturation,Brightness,Path,Curvature,Aspect Ratio\n");
-
-            responseWriterI2M = new BufferedWriter(new FileWriter(new File("assets/data/responseI2M.csv")));
-            responseWriterI2M.write("Timbre Class,Mode,Overall Volume,Tempo,Dynamic Variation,Rhythmic Regularity\n");
+            responseWriterM2I = new BufferedWriter(new FileWriter("assets/data/responseM2I.csv", true));
+            responseWriterI2M = new BufferedWriter(new FileWriter("assets/data/responseI2M.csv", true));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -138,11 +138,12 @@ public class App extends Application {
         rng = new Random(currentLevel * 0xdeaf);
 
         prologueScene = createPrologueScene(prologueRoot);
-        questionaireScene = createQuestionaireScene(questionaireRoot);
         music2ImageTutorialScene = createMusic2ImageTutorialScene(music2ImageTutorialRoot);
         music2ImageScene = createMusic2ImageScene(music2ImageRoot);
+        responseConfidenceSceneM2I = createResponseConfidenceSceneM2I(responseConfidenceRootM2I);
         image2MusicTutorialScene = createImage2MusicTutorialScene(image2MusicTutorialRoot);
         image2MusicScene = createImage2MusicScene(image2MusicRoot);
+        responseConfidenceSceneI2M = createResponseConfidenceSceneI2M(responseConfidenceRootI2M);
         epilogueScene = createEpilogueScene(epilogueRoot);
 
         primaryStage = stage;
@@ -154,132 +155,62 @@ public class App extends Application {
     private static Scene createPrologueScene(AnchorPane root) {
         root.setPrefSize(660, 625);
 
-        Text text = new Text("Welcome to the Sight\nto Sound Study!");
-        text.setFont(Font.font("Arial", FontWeight.BOLD, 36));
+        Text welcomeText = new Text("Welcome to the Sight\nto Sound IQP Study!");
+        welcomeText.setFont(Font.font("Arial", FontWeight.BOLD, 36));
+        welcomeText.setFill(Color.BLACK);
+        welcomeText.setLayoutX(100);
+        welcomeText.setLayoutY(200);
+        welcomeText.setTextAlignment(TextAlignment.CENTER);
+
+        Text text = new Text("Please enter your UUID:");
+        text.setFont(Font.font("Arial", FontWeight.BOLD, 20));
         text.setFill(Color.BLACK);
         text.setLayoutX(100);
         text.setLayoutY(300);
+        text.setTextAlignment(TextAlignment.CENTER);
+
+        TextField textField = new TextField();
+        textField.setLayoutX(100);
+        textField.setLayoutY(330);
+        textField.setPrefSize(460, 50);
+        textField.setFont(Font.font("Arial", FontWeight.BOLD, 20));
 
         MacosButton nextButton = new MacosButton("Continue");
         nextButton.setLayoutX(575);
         nextButton.setLayoutY(585);
+        nextButton.setDisable(true);
         nextButton.setOnAction(e -> {
-            currentPageProperty.set(currentPageProperty.get() + 1);
-            changeScene(questionaireScene);
-        });
-
-        root.getChildren().add(text);
-        root.getChildren().add(nextButton);
-
-        return new Scene(root);
-    }
-
-    private static Scene createQuestionaireScene(AnchorPane root) {
-        root.setPrefSize(660, 625);
-
-        Text text = new Text("Pre-Study Questionaire");
-        text.setFont(Font.font("Arial", FontWeight.BOLD, 36));
-        text.setFill(Color.BLACK);
-        text.setLayoutX(120);
-        text.setLayoutY(47);
-
-        ScrollPane scrollPane = new ScrollPane();
-        scrollPane.setPrefSize(610, 500);
-        scrollPane.setLayoutX(20);
-        scrollPane.setLayoutY(66);
-
-        AnchorPane scrollPaneContent = new AnchorPane();
-        scrollPaneContent.setPrefSize(610, 1000);
-
-        Text ageText = new Text("Please Specify Your Age:");
-        ageText.setLayoutX(20);
-        ageText.setLayoutY(30);
-        TextField ageTextField = new TextField();
-        ageTextField.setLayoutX(155);
-        ageTextField.setLayoutY(15);
-        ageTextField.setPrefSize(40, 5);
-        ageTextField.setStyle("-fx-font-size: 8px;");
-
-        Text genderText = new Text("Please Specify Your Gender:");
-        genderText.setLayoutX(20);
-        genderText.setLayoutY(60);
-
-        ToggleGroup genderToggleGroup = new ToggleGroup();
-
-        RadioButton maleRadioButton = new MacosRadioButton("Male");
-        maleRadioButton.setLayoutX(20);
-        maleRadioButton.setLayoutY(70);
-        maleRadioButton.setToggleGroup(genderToggleGroup);
-
-        RadioButton femaleRadioButton = new MacosRadioButton("Female");
-        femaleRadioButton.setLayoutX(20);
-        femaleRadioButton.setLayoutY(90);
-        femaleRadioButton.setToggleGroup(genderToggleGroup);
-
-        RadioButton otherRadioButton = new MacosRadioButton("Other");
-        otherRadioButton.setLayoutX(20);
-        otherRadioButton.setLayoutY(110);
-        otherRadioButton.setToggleGroup(genderToggleGroup);
-
-        TextField otherGenderTextField = new TextField();
-        otherGenderTextField.setPrefSize(100, 5);
-        otherGenderTextField.setStyle("-fx-font-size: 8px;");
-        otherGenderTextField.setLayoutX(75);
-        otherGenderTextField.setLayoutY(110);
-        otherGenderTextField.textProperty().addListener((observable, oldValue, newValue) -> {
-            if (!newValue.isEmpty()) {
-                otherRadioButton.setSelected(true);
-            } else {
-                otherRadioButton.setSelected(false);
-            }
-        });
-
-        RadioButton preferNotToSayRadioButton = new MacosRadioButton("Prefer Not To Say");
-        preferNotToSayRadioButton.setLayoutX(20);
-        preferNotToSayRadioButton.setLayoutY(130);
-        preferNotToSayRadioButton.setToggleGroup(genderToggleGroup);
-
-        scrollPane.setContent(scrollPaneContent);
-        scrollPaneContent.getChildren().add(ageText);
-        scrollPaneContent.getChildren().add(ageTextField);
-        scrollPaneContent.getChildren().add(genderText);
-        scrollPaneContent.getChildren().add(maleRadioButton);
-        scrollPaneContent.getChildren().add(femaleRadioButton);
-        scrollPaneContent.getChildren().add(otherRadioButton);
-        scrollPaneContent.getChildren().add(preferNotToSayRadioButton);
-        scrollPaneContent.getChildren().add(otherGenderTextField);
-
-        MacosButton nextButton = new MacosButton("Continue");
-        nextButton.setLayoutX(575);
-        nextButton.setLayoutY(585);
-        nextButton.setOnAction(e -> {
+            uuid = textField.getText();
             currentPageProperty.set(currentPageProperty.get() + 1);
             changeScene(music2ImageTutorialScene);
         });
 
-        MacosButton previousButton = new MacosButton("Back");
-        previousButton.setLayoutX(25);
-        previousButton.setLayoutY(585);
-        previousButton.setOnAction(e -> {
-            currentPageProperty.set(currentPageProperty.get() - 1);
-            changeScene(prologueScene);
+        textField.textProperty().addListener((observable, oldValue, newValue) -> {
+            boolean properLength = newValue.length() == 8;
+
+            Matcher matcher = Pattern.compile("^[0-9]*").matcher(newValue);
+            boolean properCharacters;
+            if (matcher.find()) {
+                properCharacters = matcher.group(0).equals(newValue);
+            } else {
+                properCharacters = false;
+            }
+            
+            if (properLength && properCharacters) {
+                nextButton.setDisable(false);
+            } else {
+                nextButton.setDisable(true);
+            }
         });
 
-        try {
-            questionaireWriter.write("20\tMale\tCaucasian\tEast Coast US\tComputer Science\tYes\tYes\n");
-            questionaireWriter.close();
-        } catch (IOException e1) {
-            e1.printStackTrace();
-        }
-
+        root.getChildren().add(welcomeText);
         root.getChildren().add(text);
-        root.getChildren().add(scrollPane);
+        root.getChildren().add(textField);
         root.getChildren().add(nextButton);
-        root.getChildren().add(previousButton);
 
         return new Scene(root);
     }
-
+    
     private static Scene createMusic2ImageTutorialScene(AnchorPane root) {
         root.setPrefSize(660, 625); 
 
@@ -313,47 +244,47 @@ public class App extends Application {
 
         currentPageProperty.addListener((observable, oldValue, newValue) -> {
             switch (newValue.intValue()) {
-                case 1:
-                    changeScene(questionaireScene);
+                case 0:
+                    changeScene(prologueScene);
                     break;
-                case 2:
+                case 1:
                     background.setImage(new Image("file:resources/tutorialM2I/Page1.png"));
                     break;
-                case 3:
+                case 2:
                     background.setImage(new Image("file:resources/tutorialM2I/Page2.png"));
                     gif.setVisible(false);
                     break;
-                case 4:
+                case 3:
                     background.setImage(new Image("file:resources/tutorialM2I/Page3.png"));
                     gif.setImage(new Image("file:resources/tutorialM2I/anchorPoint.gif"));
                     gif.setVisible(true);
                     break;
-                case 5:
+                case 4:
                     background.setImage(new Image("file:resources/tutorialM2I/Page4.png"));
                     gif.setImage(new Image("file:resources/tutorialM2I/controlPoint.gif"));
                     gif.setLayoutX(201);
                     gif.setLayoutY(339.4);
                     break;
-                case 6:
+                case 5:
                     background.setImage(new Image("file:resources/tutorialM2I/Page5.png"));
                     gif.setImage(new Image("file:resources/tutorialM2I/addPoint.gif"));
                     gif.setLayoutX(113.5);
                     gif.setLayoutY(177.4);
                     break;
-                case 7:
+                case 6:
                     background.setImage(new Image("file:resources/tutorialM2I/Page6.png"));
                     gif.setImage(new Image("file:resources/tutorialM2I/removePoint.gif"));
                     gif.setLayoutX(104);
                     gif.setLayoutY(159.4);
                     break;
-                case 8:
+                case 7:
                     background.setImage(new Image("file:resources/tutorialM2I/Page7.png"));
                     gif.setImage(new Image("file:resources/tutorialM2I/colorPicker.gif"));
                     gif.setLayoutX(106.5);
                     gif.setLayoutY(271.8);
                     secondGif.setVisible(false);
                     break;
-                case 9:
+                case 8:
                     background.setImage(new Image("file:resources/tutorialM2I/Page8.png"));
                     gif.setVisible(true);
                     gif.setImage(new Image("file:resources/tutorialM2I/play.gif"));
@@ -361,12 +292,17 @@ public class App extends Application {
                     gif.setLayoutY(253.2);
                     secondGif.setVisible(true);
                     break;
-                case 10:
+                case 9:
                     background.setImage(new Image("file:resources/tutorialM2I/Page9.png"));
                     gif.setVisible(false);
                     secondGif.setVisible(false);
                     break;
-                case 11:
+                case 10:
+                    timestamp = new Date();
+                    try {
+                        setLevelM2I(1);
+                    } catch (UnsupportedAudioFileException | IOException | LineUnavailableException e1) {
+                    }
                     changeScene(music2ImageScene);
                     break;
             }
@@ -381,14 +317,12 @@ public class App extends Application {
         return new Scene(root);
     }
 
-    private static Scene createMusic2ImageScene(AnchorPane root) {
+    private static Scene createMusic2ImageScene(AnchorPane root) throws UnsupportedAudioFileException, IOException, LineUnavailableException {
         root.setPrefSize(660, 625);
 
         titleLabelM2I.setLayoutX(25);
         titleLabelM2I.setLayoutY(14);
         titleLabelM2I.setStyle("-fx-font-size: 18px;");
-
-        setLevelM2I(1);
 
         splineGroupM2I.setLayoutX(0);
         splineGroupM2I.setLayoutY(0);
@@ -397,6 +331,8 @@ public class App extends Application {
         imageM2I.setLayoutY(0);
 
         imageM2I.fillProperty().bind(imageColorPropertyM2I);
+
+        mediaPlayerM2I = new SimpleAudioPlayer();
 
         audioPlayerBoxM2I.setLayoutX(182);
         audioPlayerBoxM2I.setLayoutY(537.2);
@@ -474,6 +410,7 @@ public class App extends Application {
         Rectangle greySquare = new Rectangle(412, 550, 35, 10);
         greySquare.setFill(new Color(0.7686274509803922, 0.7686274509803922, 0.7686274509803922, 1));
 
+        playheadM2I = new JFXSlider();
         playheadM2I.setLayoutX(253.4);
         playheadM2I.setLayoutY(550.5);
         playheadM2I.setPrefSize(195, 10);
@@ -497,7 +434,7 @@ public class App extends Application {
         playheadTextM2I.setFill(Color.BLACK);
         playheadTextM2I.setFont(Font.font("Arial", FontWeight.NORMAL, 10));
 
-        songDurationTextM2I = new Text(mediaPlayerM2I.getSongDuration());
+        songDurationTextM2I = new Text();
         songDurationTextM2I.setLayoutX(418.3);
         songDurationTextM2I.setLayoutY(561);
         songDurationTextM2I.setFill(Color.BLACK);
@@ -507,26 +444,12 @@ public class App extends Application {
         submitButtonM2I.setLayoutY(590);
         submitButtonM2I.setPrefSize(100, 30);
         submitButtonM2I.setOnAction(e -> {
-            currentLevel++;
             try {
                 mediaPlayerM2I.stop();
             } catch (UnsupportedAudioFileException | IOException | LineUnavailableException e1) {
                 e1.printStackTrace();
             }
-            if (currentLevel == 16) {
-                currentLevel = 1;
-                try {
-                    gatherResponseM2I();
-                    responseWriterM2I.close();
-                } catch (IOException e1) {
-                    e1.printStackTrace();
-                }
-                currentPageProperty.set(currentPageProperty.get() + 1);
-                changeScene(image2MusicTutorialScene);
-            } else {
-                gatherResponseM2I();
-                setLevelM2I(currentLevel);
-            }
+            changeScene(responseConfidenceSceneM2I);
         });
 
         root.getChildren().add(titleLabelM2I);
@@ -546,6 +469,223 @@ public class App extends Application {
         Scene scene = new Scene(root);
         scene.getStylesheets().add(App.class.getResource("color.css").toExternalForm());
         return scene;
+    }
+
+    private static Scene createResponseConfidenceSceneM2I(AnchorPane root) {
+        root.setPrefSize(660, 625);
+
+        Label titleLabel = new MacosLabel("Assessment of Response");
+        titleLabel.setLayoutX(229);
+        titleLabel.setLayoutY(14);
+        titleLabel.setStyle("-fx-font-size: 18px;");
+
+        Label confidenceLabel = new MacosLabel("How confident are you in your response?");
+        confidenceLabel.setLayoutX(50);
+        confidenceLabel.setLayoutY(60);
+
+        ToggleGroup confidenceToggleGroup = new ToggleGroup();
+
+        RadioButton hiddenRadioButton = new MacosRadioButton();
+        hiddenRadioButton.setPrefSize(16, 16);
+        hiddenRadioButton.setLayoutX(0);
+        hiddenRadioButton.setLayoutY(0);
+        hiddenRadioButton.setVisible(true);
+        hiddenRadioButton.setDisable(false);
+        hiddenRadioButton.setToggleGroup(confidenceToggleGroup);
+
+        RadioButton veryConfidentRadioButton = new MacosRadioButton();
+        veryConfidentRadioButton.setPrefSize(16, 16);
+        veryConfidentRadioButton.setLayoutX(80);
+        veryConfidentRadioButton.setLayoutY(90);
+        veryConfidentRadioButton.setToggleGroup(confidenceToggleGroup);
+        veryConfidentRadioButton.setOnMousePressed(e -> {
+            hiddenRadioButton.setVisible(false);
+        });
+
+        RadioButton confidentRadioButton = new MacosRadioButton();
+        confidentRadioButton.setPrefSize(16, 16);
+        confidentRadioButton.setLayoutX(181);
+        confidentRadioButton.setLayoutY(90);
+        confidentRadioButton.setToggleGroup(confidenceToggleGroup);
+        confidentRadioButton.setOnMousePressed(e -> {
+            hiddenRadioButton.setVisible(false);
+        });
+
+        RadioButton slightlyConfidentRadioButton = new MacosRadioButton();
+        slightlyConfidentRadioButton.setPrefSize(16, 16);
+        slightlyConfidentRadioButton.setLayoutX(282);
+        slightlyConfidentRadioButton.setLayoutY(90);
+        slightlyConfidentRadioButton.setToggleGroup(confidenceToggleGroup);
+        slightlyConfidentRadioButton.setOnMousePressed(e -> {
+            hiddenRadioButton.setVisible(false);
+        });
+
+        RadioButton slightlyUnsureRadioButton = new MacosRadioButton();
+        slightlyUnsureRadioButton.setPrefSize(16, 16);
+        slightlyUnsureRadioButton.setLayoutX(383);
+        slightlyUnsureRadioButton.setLayoutY(90);
+        slightlyUnsureRadioButton.setToggleGroup(confidenceToggleGroup);
+        slightlyUnsureRadioButton.setOnMousePressed(e -> {
+            hiddenRadioButton.setVisible(false);
+        });
+
+        RadioButton unsureRadioButton = new MacosRadioButton();
+        unsureRadioButton.setPrefSize(16, 16);
+        unsureRadioButton.setLayoutX(484);
+        unsureRadioButton.setLayoutY(90);
+        unsureRadioButton.setToggleGroup(confidenceToggleGroup);
+        unsureRadioButton.setOnMousePressed(e -> {
+            hiddenRadioButton.setVisible(false);
+        });
+
+        RadioButton veryUnsureRadioButton = new MacosRadioButton();
+        veryUnsureRadioButton.setPrefSize(16, 16);
+        veryUnsureRadioButton.setLayoutX(585);
+        veryUnsureRadioButton.setLayoutY(90);
+        veryUnsureRadioButton.setToggleGroup(confidenceToggleGroup);
+        veryUnsureRadioButton.setOnMousePressed(e -> {
+            hiddenRadioButton.setVisible(false);
+        });
+
+        Label veryConfidentLabel = new MacosLabel("Very Confident");
+        veryConfidentLabel.setPrefSize(85, 16);
+        veryConfidentLabel.setLayoutX(45);
+        veryConfidentLabel.setLayoutY(115);
+        veryConfidentLabel.setAlignment(Pos.TOP_CENTER);
+
+        Label confidentLabel = new MacosLabel("Confident");
+        confidentLabel.setPrefSize(70, 16);
+        confidentLabel.setLayoutX(153);
+        confidentLabel.setLayoutY(115);
+        confidentLabel.setAlignment(Pos.TOP_CENTER);
+
+        Label slightlyConfidentLabel = new MacosLabel("Slightly Confident");
+        slightlyConfidentLabel.setPrefSize(115, 16);
+        slightlyConfidentLabel.setLayoutX(233);
+        slightlyConfidentLabel.setLayoutY(115);
+        slightlyConfidentLabel.setAlignment(Pos.TOP_CENTER);
+
+        Label slightlyUnsureLabel = new MacosLabel("Slightly Unsure");
+        slightlyUnsureLabel.setPrefSize(100, 16);
+        slightlyUnsureLabel.setLayoutX(342);
+        slightlyUnsureLabel.setLayoutY(115);
+        slightlyUnsureLabel.setAlignment(Pos.TOP_CENTER);
+
+        Label unsureLabel = new MacosLabel("Unsure");
+        unsureLabel.setPrefSize(70, 16);
+        unsureLabel.setLayoutX(457);
+        unsureLabel.setLayoutY(115);
+        unsureLabel.setAlignment(Pos.TOP_CENTER);
+
+        Label veryUnsureLabel = new MacosLabel("Very Unsure");
+        veryUnsureLabel.setPrefSize(70, 16);
+        veryUnsureLabel.setLayoutX(555);
+        veryUnsureLabel.setLayoutY(115);
+        veryUnsureLabel.setAlignment(Pos.TOP_CENTER);
+
+        Group confidenceGroup = new Group();
+        confidenceGroup.getChildren().add(hiddenRadioButton);
+        confidenceGroup.getChildren().add(veryConfidentRadioButton);
+        confidenceGroup.getChildren().add(confidentRadioButton);
+        confidenceGroup.getChildren().add(slightlyConfidentRadioButton);
+        confidenceGroup.getChildren().add(slightlyUnsureRadioButton);
+        confidenceGroup.getChildren().add(unsureRadioButton);
+        confidenceGroup.getChildren().add(veryUnsureRadioButton);
+        confidenceGroup.getChildren().add(veryConfidentLabel);
+        confidenceGroup.getChildren().add(confidentLabel);
+        confidenceGroup.getChildren().add(slightlyConfidentLabel);
+        confidenceGroup.getChildren().add(slightlyUnsureLabel);
+        confidenceGroup.getChildren().add(unsureLabel);
+        confidenceGroup.getChildren().add(veryUnsureLabel);
+
+        Label notesLabel = new MacosLabel("Is there anything you would like to note?");
+        notesLabel.setLayoutX(50);
+        notesLabel.setLayoutY(160);
+
+        TextArea notesTextArea = new TextArea();
+        notesTextArea.setPrefSize(573, 385);
+        notesTextArea.setLayoutX(50);
+        notesTextArea.setLayoutY(180);
+        notesTextArea.textProperty().addListener((observable, oldValue, newValue) -> {
+            if (newValue.contains(",")) {
+                notesTextArea.setText(oldValue);
+            }
+        });
+
+        MacosButton nextButton = new MacosButton("Continue");
+        nextButton.setLayoutX(575);
+        nextButton.setLayoutY(585);
+        nextButton.setDisable(true);
+        confidenceToggleGroup.selectedToggleProperty().addListener((observable, oldValue, newValue) -> {
+            if (confidenceToggleGroup.getSelectedToggle() != null) {
+                if (confidenceToggleGroup.getSelectedToggle() == hiddenRadioButton) {
+                    hiddenRadioButton.setSelected(false);
+                } else {
+                    nextButton.setDisable(false);
+                }
+            }
+        });
+        nextButton.setOnAction(e -> {
+            String confidenceLevel;
+            if (confidenceToggleGroup.getSelectedToggle() == veryConfidentRadioButton) {
+                confidenceLevel = "Very Confident";
+            } else if (confidenceToggleGroup.getSelectedToggle() == confidentRadioButton) {
+                confidenceLevel = "Confident";
+            } else if (confidenceToggleGroup.getSelectedToggle() == slightlyConfidentRadioButton) {
+                confidenceLevel = "Slightly Confident";
+            } else if (confidenceToggleGroup.getSelectedToggle() == slightlyUnsureRadioButton) {
+                confidenceLevel = "Slightly Unsure";
+            } else if (confidenceToggleGroup.getSelectedToggle() == unsureRadioButton) {
+                confidenceLevel = "Unsure";
+            } else {
+                confidenceLevel = "Very Unsure";
+            }
+
+            hiddenRadioButton.setVisible(true);
+
+            currentLevel++;
+            if (currentLevel == 16) {
+                currentLevel = 1;
+                try {
+                    gatherResponseM2I();
+                    responseWriterM2I.write(confidenceLevel + "," + notesTextArea.getText() + "\n");
+                    responseWriterM2I.close();
+                } catch (IOException e1) {
+                    e1.printStackTrace();
+                }
+                confidenceToggleGroup.selectToggle(null);
+                notesTextArea.clear();
+                nextButton.setDisable(true);
+                currentPageProperty.set(currentPageProperty.get() + 1);
+                changeScene(image2MusicTutorialScene);
+            } else {
+                gatherResponseM2I();
+                try {
+                    responseWriterM2I.write(confidenceLevel + "," + notesTextArea.getText() + "\n");
+                } catch (IOException e1) {
+                    e1.printStackTrace();
+                }
+                confidenceToggleGroup.selectToggle(null);
+                notesTextArea.clear();
+                nextButton.setDisable(true);
+                try {
+                    timestamp = new Date();
+                    setLevelM2I(currentLevel);
+                } catch (UnsupportedAudioFileException | IOException | LineUnavailableException e1) {
+                    e1.printStackTrace();
+                }
+                changeScene(music2ImageScene);
+            }
+        });
+
+        root.getChildren().add(titleLabel);
+        root.getChildren().add(confidenceLabel);
+        root.getChildren().add(confidenceGroup);
+        root.getChildren().add(notesLabel);
+        root.getChildren().add(notesTextArea);
+        root.getChildren().add(nextButton);
+
+        return new Scene(root);
     }
 
     private static Scene createImage2MusicTutorialScene(AnchorPane root) {
@@ -579,34 +719,36 @@ public class App extends Application {
 
         currentPageProperty.addListener((observable, oldValue, newValue) -> {
             switch (newValue.intValue()) {
-                case 12:
+                case 11:
                     background.setImage(new Image("file:resources/tutorialI2M/Page1.png"));
                     previousButton.setVisible(false);
                     break;
-                case 13:
+                case 12:
                     background.setImage(new Image("file:resources/tutorialI2M/Page2.png"));
                     previousButton.setVisible(true);
                     gif.setVisible(false);
                     break;
-                case 14:
+                case 13:
                     background.setImage(new Image("file:resources/tutorialI2M/Page3.png"));
                     gif.setImage(new Image("file:resources/tutorialI2M/knob.gif"));
                     gif.setLayoutX(180);
                     gif.setLayoutY(338.9);
                     gif.setVisible(true);
                     break;
-                case 15:
+                case 14:
                     background.setImage(new Image("file:resources/tutorialI2M/Page4.png"));
                     gif.setImage(new Image("file:resources/tutorialI2M/play.gif"));
                     gif.setLayoutX(130);
                     gif.setLayoutY(189);
                     gif.setVisible(true);
                     break;
-                case 16:
+                case 15:
                     background.setImage(new Image("file:resources/tutorialI2M/Page5.png"));
                     gif.setVisible(false);
                     break;
-                case 17:
+                case 16:
+                    timestamp = new Date();
+                    setLevelI2M(1);
                     changeScene(image2MusicScene);
                     break;
             }
@@ -679,7 +821,7 @@ public class App extends Application {
         tempoKnobI2M.setLayoutX(386);
         tempoKnobI2M.setLayoutY(508);
         tempoKnobI2M.valueProperty().addListener((observable, oldValue, newValue) -> {
-            tempoKnobI2M.setValue(Math.round(newValue.doubleValue() * 8) / 8.0);
+            tempoKnobI2M.setValue(Math.round(newValue.doubleValue()));
         });
 
         dynamicVariationKnobI2M.setLayoutX(471);
@@ -767,24 +909,8 @@ public class App extends Application {
         submitButtonI2M.setLayoutY(575);
         submitButtonI2M.setPrefSize(100, 30);
         submitButtonI2M.setOnAction(e -> {
-            currentLevel++;
-            if (currentLevel == 16) {
-                currentLevel = 1;
-                try {
-                    gatherResponseI2M();
-                    responseWriterI2M.close();
-                } catch (IOException e1) {
-                    e1.printStackTrace();
-                }
-                currentPageProperty.set(currentPageProperty.get() + 1);
-                changeScene(epilogueScene);
-            } else {
-                gatherResponseI2M();
-                setLevelI2M(currentLevel);
-            }
+            changeScene(responseConfidenceSceneI2M);
         });
-
-        setLevelI2M(1);
 
         root.getChildren().add(titleLabelI2M);
         root.getChildren().add(imageI2M);
@@ -802,6 +928,219 @@ public class App extends Application {
         root.getChildren().add(rhythmicRegularityKnobI2M);
         root.getChildren().add(playButtonI2M);
         root.getChildren().add(submitButtonI2M);
+
+        return new Scene(root);
+    }
+
+    private static Scene createResponseConfidenceSceneI2M(AnchorPane root) {
+        root.setPrefSize(660, 625);
+
+        Label titleLabel = new MacosLabel("Assessment of Response");
+        titleLabel.setLayoutX(229);
+        titleLabel.setLayoutY(14);
+        titleLabel.setStyle("-fx-font-size: 18px;");
+
+        Label confidenceLabel = new MacosLabel("How confident are you in your response?");
+        confidenceLabel.setLayoutX(50);
+        confidenceLabel.setLayoutY(60);
+
+        ToggleGroup confidenceToggleGroup = new ToggleGroup();
+
+        RadioButton hiddenRadioButton = new MacosRadioButton();
+        hiddenRadioButton.setPrefSize(16, 16);
+        hiddenRadioButton.setLayoutX(0);
+        hiddenRadioButton.setLayoutY(0);
+        hiddenRadioButton.setVisible(true);
+        hiddenRadioButton.setDisable(false);
+        hiddenRadioButton.setToggleGroup(confidenceToggleGroup);
+
+        RadioButton veryConfidentRadioButton = new MacosRadioButton();
+        veryConfidentRadioButton.setPrefSize(16, 16);
+        veryConfidentRadioButton.setLayoutX(80);
+        veryConfidentRadioButton.setLayoutY(90);
+        veryConfidentRadioButton.setToggleGroup(confidenceToggleGroup);
+        veryConfidentRadioButton.setOnMousePressed(e -> {
+            hiddenRadioButton.setVisible(false);
+        });
+
+        RadioButton confidentRadioButton = new MacosRadioButton();
+        confidentRadioButton.setPrefSize(16, 16);
+        confidentRadioButton.setLayoutX(181);
+        confidentRadioButton.setLayoutY(90);
+        confidentRadioButton.setToggleGroup(confidenceToggleGroup);
+        confidentRadioButton.setOnMousePressed(e -> {
+            hiddenRadioButton.setVisible(false);
+        });
+
+        RadioButton slightlyConfidentRadioButton = new MacosRadioButton();
+        slightlyConfidentRadioButton.setPrefSize(16, 16);
+        slightlyConfidentRadioButton.setLayoutX(282);
+        slightlyConfidentRadioButton.setLayoutY(90);
+        slightlyConfidentRadioButton.setToggleGroup(confidenceToggleGroup);
+        slightlyConfidentRadioButton.setOnMousePressed(e -> {
+            hiddenRadioButton.setVisible(false);
+        });
+
+        RadioButton slightlyUnsureRadioButton = new MacosRadioButton();
+        slightlyUnsureRadioButton.setPrefSize(16, 16);
+        slightlyUnsureRadioButton.setLayoutX(383);
+        slightlyUnsureRadioButton.setLayoutY(90);
+        slightlyUnsureRadioButton.setToggleGroup(confidenceToggleGroup);
+        slightlyUnsureRadioButton.setOnMousePressed(e -> {
+            hiddenRadioButton.setVisible(false);
+        });
+
+        RadioButton unsureRadioButton = new MacosRadioButton();
+        unsureRadioButton.setPrefSize(16, 16);
+        unsureRadioButton.setLayoutX(484);
+        unsureRadioButton.setLayoutY(90);
+        unsureRadioButton.setToggleGroup(confidenceToggleGroup);
+        unsureRadioButton.setOnMousePressed(e -> {
+            hiddenRadioButton.setVisible(false);
+        });
+
+        RadioButton veryUnsureRadioButton = new MacosRadioButton();
+        veryUnsureRadioButton.setPrefSize(16, 16);
+        veryUnsureRadioButton.setLayoutX(585);
+        veryUnsureRadioButton.setLayoutY(90);
+        veryUnsureRadioButton.setToggleGroup(confidenceToggleGroup);
+        veryUnsureRadioButton.setOnMousePressed(e -> {
+            hiddenRadioButton.setVisible(false);
+        });
+
+        Label veryConfidentLabel = new MacosLabel("Very Confident");
+        veryConfidentLabel.setPrefSize(85, 16);
+        veryConfidentLabel.setLayoutX(45);
+        veryConfidentLabel.setLayoutY(115);
+        veryConfidentLabel.setAlignment(Pos.TOP_CENTER);
+
+        Label confidentLabel = new MacosLabel("Confident");
+        confidentLabel.setPrefSize(70, 16);
+        confidentLabel.setLayoutX(153);
+        confidentLabel.setLayoutY(115);
+        confidentLabel.setAlignment(Pos.TOP_CENTER);
+
+        Label slightlyConfidentLabel = new MacosLabel("Slightly Confident");
+        slightlyConfidentLabel.setPrefSize(115, 16);
+        slightlyConfidentLabel.setLayoutX(233);
+        slightlyConfidentLabel.setLayoutY(115);
+        slightlyConfidentLabel.setAlignment(Pos.TOP_CENTER);
+
+        Label slightlyUnsureLabel = new MacosLabel("Slightly Unsure");
+        slightlyUnsureLabel.setPrefSize(100, 16);
+        slightlyUnsureLabel.setLayoutX(342);
+        slightlyUnsureLabel.setLayoutY(115);
+        slightlyUnsureLabel.setAlignment(Pos.TOP_CENTER);
+
+        Label unsureLabel = new MacosLabel("Unsure");
+        unsureLabel.setPrefSize(70, 16);
+        unsureLabel.setLayoutX(457);
+        unsureLabel.setLayoutY(115);
+        unsureLabel.setAlignment(Pos.TOP_CENTER);
+
+        Label veryUnsureLabel = new MacosLabel("Very Unsure");
+        veryUnsureLabel.setPrefSize(70, 16);
+        veryUnsureLabel.setLayoutX(555);
+        veryUnsureLabel.setLayoutY(115);
+        veryUnsureLabel.setAlignment(Pos.TOP_CENTER);
+
+        Group confidenceGroup = new Group();
+        confidenceGroup.getChildren().add(hiddenRadioButton);
+        confidenceGroup.getChildren().add(veryConfidentRadioButton);
+        confidenceGroup.getChildren().add(confidentRadioButton);
+        confidenceGroup.getChildren().add(slightlyConfidentRadioButton);
+        confidenceGroup.getChildren().add(slightlyUnsureRadioButton);
+        confidenceGroup.getChildren().add(unsureRadioButton);
+        confidenceGroup.getChildren().add(veryUnsureRadioButton);
+        confidenceGroup.getChildren().add(veryConfidentLabel);
+        confidenceGroup.getChildren().add(confidentLabel);
+        confidenceGroup.getChildren().add(slightlyConfidentLabel);
+        confidenceGroup.getChildren().add(slightlyUnsureLabel);
+        confidenceGroup.getChildren().add(unsureLabel);
+        confidenceGroup.getChildren().add(veryUnsureLabel);
+
+        Label notesLabel = new MacosLabel("Is there anything you would like to note?");
+        notesLabel.setLayoutX(50);
+        notesLabel.setLayoutY(160);
+
+        TextArea notesTextArea = new TextArea();
+        notesTextArea.setPrefSize(573, 385);
+        notesTextArea.setLayoutX(50);
+        notesTextArea.setLayoutY(180);
+        notesTextArea.textProperty().addListener((observable, oldValue, newValue) -> {
+            if (newValue.contains(",")) {
+                notesTextArea.setText(oldValue);
+            }
+        });
+
+        MacosButton nextButton = new MacosButton("Continue");
+        nextButton.setLayoutX(575);
+        nextButton.setLayoutY(585);
+        nextButton.setDisable(true);
+        confidenceToggleGroup.selectedToggleProperty().addListener((observable, oldValue, newValue) -> {
+            if (confidenceToggleGroup.getSelectedToggle() != null) {
+                if (confidenceToggleGroup.getSelectedToggle() == hiddenRadioButton) {
+                    hiddenRadioButton.setSelected(false);
+                } else {
+                    nextButton.setDisable(false);
+                }
+            }
+        });
+        nextButton.setOnAction(e -> {
+            String confidenceLevel;
+            if (confidenceToggleGroup.getSelectedToggle() == veryConfidentRadioButton) {
+                confidenceLevel = "Very Confident";
+            } else if (confidenceToggleGroup.getSelectedToggle() == confidentRadioButton) {
+                confidenceLevel = "Confident";
+            } else if (confidenceToggleGroup.getSelectedToggle() == slightlyConfidentRadioButton) {
+                confidenceLevel = "Slightly Confident";
+            } else if (confidenceToggleGroup.getSelectedToggle() == slightlyUnsureRadioButton) {
+                confidenceLevel = "Slightly Unsure";
+            } else if (confidenceToggleGroup.getSelectedToggle() == unsureRadioButton) {
+                confidenceLevel = "Unsure";
+            } else {
+                confidenceLevel = "Very Unsure";
+            }
+
+            hiddenRadioButton.setVisible(true);
+
+            currentLevel++;
+            if (currentLevel == 16) {
+                currentLevel = 1;
+                try {
+                    gatherResponseI2M();
+                    responseWriterI2M.write(confidenceLevel + "," + notesTextArea.getText() + "\n");
+                    responseWriterI2M.close();
+                } catch (IOException e1) {
+                    e1.printStackTrace();
+                }
+                confidenceToggleGroup.selectToggle(null);
+                notesTextArea.clear();
+                nextButton.setDisable(true);
+                currentPageProperty.set(currentPageProperty.get() + 1);
+                changeScene(epilogueScene);
+            } else {
+                gatherResponseI2M();
+                try {
+                    responseWriterI2M.write(confidenceLevel + "," + notesTextArea.getText() + "\n");
+                } catch (IOException e1) {
+                    e1.printStackTrace();
+                }
+                confidenceToggleGroup.selectToggle(null);
+                notesTextArea.clear();
+                nextButton.setDisable(true);
+                timestamp = new Date();
+                setLevelI2M(currentLevel);
+                changeScene(image2MusicScene);
+            }
+        });
+
+        root.getChildren().add(titleLabel);
+        root.getChildren().add(confidenceLabel);
+        root.getChildren().add(confidenceGroup);
+        root.getChildren().add(notesLabel);
+        root.getChildren().add(notesTextArea);
+        root.getChildren().add(nextButton);
 
         return new Scene(root);
     }
@@ -832,7 +1171,6 @@ public class App extends Application {
     private static void changeScene(Scene scene) {
         primaryStage.setScene(scene);
     }
-
 
     /* Music to Image Functions and Structures */
     private static CurveInfo createCurve(Anchor startPoint, Anchor endPoint) {
@@ -1022,10 +1360,17 @@ public class App extends Application {
         splinePointsM2I.clear();
         splineAnchorsM2I.clear();
         splineCurvesM2I.clear();
+        splineCurvesInfoM2I.clear();
         splineGroupM2I.getChildren().clear();
         initializeCurves();
         colorChooserM2I.setStyle("-fx-background-radius: 15; -fx-background-color: white; -fx-border-radius: 15; -fx-border-color: black;");
         imageColorPropertyM2I.setValue(Color.WHITE);
+
+        playheadM2I.setMax(mediaPlayerM2I.getDurationInSeconds() * 2);
+        playheadM2I.setValue(0);
+        playheadTextM2I.setText("0:00");
+        songDurationTextM2I.setText(mediaPlayerM2I.getSongDuration());
+
         // if the music is playing, stop it
         if (mediaPlayerStatusM2I == 0) {
             playStopButtonM2I.fire();
@@ -1035,7 +1380,7 @@ public class App extends Application {
     private static String getPath() {
         String path;
         if (splineCurvesM2I.size() == 0) {
-            path = "M " + splinePointsM2I.get(0).getX() + " " + splinePointsM2I.get(0).getY();
+            path = "M " + splineAnchorsM2I.get(0).getCenterX() + " " + splineAnchorsM2I.get(0).getCenterY();
         } else {
             path = "M " + splineCurvesM2I.get(0).getStartX() + " " + splineCurvesM2I.get(0).getStartY();
             for (int i = 0; i < splineCurvesM2I.size(); i++) {
@@ -1045,27 +1390,19 @@ public class App extends Application {
         return path + " Z";
     }
 
-    private static void setLevelM2I(int level) {
+    private static void setLevelM2I(int level) throws UnsupportedAudioFileException, IOException, LineUnavailableException {
         String levelID = level + "a";
         JSONObject levelJSONObject = (JSONObject) levelsJSONObject.get(levelID);
-
-        try {
-            File file = new File("assets/music/" + levelJSONObject.get("song") + ".wav");
-            mediaPlayerM2I = new SimpleAudioPlayer(file);
-            mediaPlayerM2I.addChangeListener();
-
-            playheadM2I = new JFXSlider(0, mediaPlayerM2I.getDurationInSeconds() * 2, 0);
-        } catch (UnsupportedAudioFileException | IOException | LineUnavailableException ex) {
-            System.out.println("Error: Can't locate the audio file.");
-        }
-
+        mediaPlayerM2I.setAudioFile(new File("assets/music/" + (String) levelJSONObject.get("song") + ".wav"));
+        levelParametersM2I = currentLevel + "," + timestamp.format("yyyy-MM-dd HH:mm:ss.SSS zzz") + "," + levelJSONObject.get("timbreClass") + "," + levelJSONObject.get("mode") + "," + levelJSONObject.get("tempo") + "," + levelJSONObject.get("rhythmicRegularity") + "," + levelJSONObject.get("dynamicVariation");
         resetM2I();
     }
 
     private static void gatherResponseM2I() {
         try {
             Color color = imageColorPropertyM2I.getValue();
-            responseWriterM2I.write(color.getHue() + "," + color.getSaturation() + "," + color.getBrightness() + "," + getPath() + "," + "TBD" + "," + "TBD\n");
+            long elapsedTime = System.currentTimeMillis() - timestamp.getMillisecondsUTC();
+            responseWriterM2I.write(uuid + "," + levelParametersM2I + "," + color.getHue() + "," + color.getSaturation() + "," + color.getBrightness() + "," + getPath() + "," + splineAnchorsM2I.size() + "," + elapsedTime + ",");
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -1200,15 +1537,19 @@ public class App extends Application {
 
     static class SimpleAudioPlayer {
         private long currentFrame;
-        private String filePath;
+        private File file;
         private Clip clip;
         private AudioInputStream audioInputStream;
     
+        public SimpleAudioPlayer() {}
+
         public SimpleAudioPlayer(File file) throws UnsupportedAudioFileException, IOException, LineUnavailableException {
-            filePath = file.getAbsolutePath();
-            audioInputStream = AudioSystem.getAudioInputStream(file);
-            clip = AudioSystem.getClip();
-            clip.open(audioInputStream);
+            setAudioFile(file);
+        }
+
+        public void setAudioFile(File file) throws UnsupportedAudioFileException, IOException, LineUnavailableException {
+            this.file = file;
+            resetAudioStream();
         }
 
         public long getDurationInSeconds() {
@@ -1273,8 +1614,10 @@ public class App extends Application {
         }
         
         public void resetAudioStream() throws UnsupportedAudioFileException, IOException, LineUnavailableException {
-            audioInputStream = AudioSystem.getAudioInputStream(new File(filePath));
+            audioInputStream = AudioSystem.getAudioInputStream(file);
+            clip = AudioSystem.getClip();
             clip.open(audioInputStream);
+            addChangeListener();
         }
 
         public boolean isFinished() {
@@ -1284,7 +1627,6 @@ public class App extends Application {
         public void addChangeListener() {
             long clipLength = clip.getMicrosecondLength() / 1000000;
             long clipLengthHalfSeconds = clip.getMicrosecondLength() / 500000;
-
 
             clip.addLineListener(event -> {
                 long lastSecond = 0L;
@@ -1316,6 +1658,7 @@ public class App extends Application {
         }
     }
 
+    
     /* Image to Music Functions and Structures */
     private static void resetI2M(String fileName) {
         LinkedList<Integer> pitches = SVGReader.getSong(fileName);
@@ -1534,7 +1877,8 @@ public class App extends Application {
 
     private static void gatherResponseI2M() {
         try {
-            responseWriterI2M.write(getTimbreNameI2M() + "," + getModeNameI2M() + "," + getDynamicNameI2M() + "," + getTempoNameI2M() + "," + (int) dynamicVariationKnobI2M.getValue() + "," + (int) rhythmicRegularityKnobI2M.getValue() + "\n");
+            long elapsedTime = System.currentTimeMillis() - timestamp.getMillisecondsUTC();
+            responseWriterI2M.write(uuid + "," + levelParametersI2M + "," + getTimbreNameI2M() + "," + getModeNameI2M() + "," + getDynamicNameI2M() + "," + getTempoNameI2M() + "," + ((int) (33.3 * dynamicVariationKnobI2M.getValue() + 0.5) / 100.0) + "," + getRhythmicRegularity() + ","+ elapsedTime + ",");
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -1551,9 +1895,10 @@ public class App extends Application {
         tempoKnobI2M.setValue((Double) levelJSONObject.get("tempo"));
         dynamicVariationKnobI2M.setValue((Double) levelJSONObject.get("dynamicVariation"));
         rhythmicRegularityKnobI2M.setValue((Double) levelJSONObject.get("rhythmicRegularity"));
+        levelParametersI2M = currentLevel + "," + timestamp.format("yyyy-MM-dd HH:mm:ss.SSS zzz") + "," + levelJSONObject.get("hue") + "," + levelJSONObject.get("saturation") + "," + levelJSONObject.get("brightness") + "," + levelJSONObject.get("path");
     }
 
-   private static String getTimbreNameI2M() {
+    private static String getTimbreNameI2M() {
 		switch ((int) timbreClassKnobI2M.getValue()) {
 			case 0:
 				return "Plucked Strings";
@@ -1599,27 +1944,32 @@ public class App extends Application {
     }
 
     private static String getTempoNameI2M() {
-        int tempo = (int) tempoKnobI2M.getValue() + 25;
-        if (25 <= tempo && tempo < 40) {
-            return "Grave";
-        } else if (40 <= tempo && tempo < 53) {
-            return "Largo";
-        } else if (53 <= tempo && tempo < 66) {
-            return "Lento";
-        } else if (66 <= tempo && tempo < 76) {
-            return "Adagio";
-        } else if (76 <= tempo && tempo < 108) {
-            return "Andante";
-        } else if (108 <= tempo && tempo < 120) {
-            return "Moderato";
-        } else if (120 <= tempo && tempo < 156) {
-            return "Allegro";
-        } else if (156 <= tempo && tempo < 176) {
-            return "Vivace";
-        } else if (176 <= tempo && tempo <= 200) {
-            return "Presto";
+        int tempo = (int) tempoKnobI2M.getValue() + 40;
+        if (40 <= tempo && tempo < 100) {
+            return "Slow";
+        } else if (100 <= tempo && tempo < 160) {
+            return "Moderate";
+        } else if (160 <= tempo && tempo < 220) {
+            return "Fast";
         } else {
             return null;
+        }
+    }
+
+    private static String getRhythmicRegularity() {
+        int regularity = (int) rhythmicRegularityKnobI2M.getValue();
+        switch (regularity) {
+            case 0:
+            case 1:
+                return "Syncopated";
+            case 2:
+            case 3:
+                return "Irregular";
+            case 4:
+            case 5:
+                return "Regular";
+            default:
+                return null;
         }
     }
 }

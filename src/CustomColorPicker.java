@@ -170,6 +170,7 @@ public class CustomColorPicker extends VBox {
     private void updateHSBColor() {
         Color newColor = Color.hsb(hue.get(), clamp(sat.get() / 100),
                 clamp(bright.get() / 100), clamp(alpha.get() / 100));
+        
         setCustomColor(newColor);
     }
 
@@ -180,7 +181,7 @@ public class CustomColorPicker extends VBox {
     }
 
     static double clamp(double value) {
-        return value < 0 ? 0 : value > 1 ? 1 : value;
+        return value < 0.01 ? 0.01 : value > 1 ? 1 : value; // NOTE: 0.01 is used to prevent automatically setting hue to 0 when saturation or brightness is 0
     }
 
     private static LinearGradient createHueGradient() {
