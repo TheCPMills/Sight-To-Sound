@@ -662,6 +662,7 @@ public class App extends Application {
                 gatherResponseM2I();
                 try {
                     responseWriterM2I.write(confidenceLevel + "," + notesTextArea.getText() + "\n");
+                    responseWriterM2I.close();
                 } catch (IOException e1) {
                     e1.printStackTrace();
                 }
@@ -1123,6 +1124,7 @@ public class App extends Application {
                 gatherResponseI2M();
                 try {
                     responseWriterI2M.write(confidenceLevel + "," + notesTextArea.getText() + "\n");
+                    responseWriterI2M.close();
                 } catch (IOException e1) {
                     e1.printStackTrace();
                 }
@@ -1402,6 +1404,7 @@ public class App extends Application {
         try {
             Color color = imageColorPropertyM2I.getValue();
             long elapsedTime = System.currentTimeMillis() - timestamp.getMillisecondsUTC();
+            responseWriterM2I = new BufferedWriter(new FileWriter("assets/data/responseM2I.csv", true));
             responseWriterM2I.write(uuid + "," + levelParametersM2I + "," + color.getHue() + "," + color.getSaturation() + "," + color.getBrightness() + "," + getPath() + "," + splineAnchorsM2I.size() + "," + elapsedTime + ",");
         } catch (IOException e) {
             e.printStackTrace();
@@ -1878,7 +1881,8 @@ public class App extends Application {
     private static void gatherResponseI2M() {
         try {
             long elapsedTime = System.currentTimeMillis() - timestamp.getMillisecondsUTC();
-            responseWriterI2M.write(uuid + "," + levelParametersI2M + "," + getTimbreNameI2M() + "," + getModeNameI2M() + "," + getDynamicNameI2M() + "," + getTempoNameI2M() + "," + ((int) (33.3 * dynamicVariationKnobI2M.getValue() + 0.5) / 100.0) + "," + getRhythmicRegularity() + ","+ elapsedTime + ",");
+            responseWriterI2M = new BufferedWriter(new FileWriter("assets/data/responseI2M.csv", true));
+            responseWriterI2M.write(uuid + "," + levelParametersI2M + "," + getTimbreNameI2M() + "," + getModeNameI2M() + "," + getDynamicNameI2M() + "," + getTempoNameI2M() + "," + getRhythmicRegularity() + "," + ((int) (33.3 * dynamicVariationKnobI2M.getValue() + 0.5) / 100.0) + ","+ elapsedTime + ",");
         } catch (IOException e) {
             e.printStackTrace();
         }
