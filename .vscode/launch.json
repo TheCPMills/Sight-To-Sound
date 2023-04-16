@@ -2,6 +2,13 @@
     "configurations": [
         {
             "type": "java",
+            "name": "DataAnalyzer",
+            "request": "launch",
+            "mainClass": "DataAnalyzer",
+            "projectName": "Sight-To-Sound_55e57162"
+        },
+        {
+            "type": "java",
             "name": "Launch SVGReader",
             "request": "launch",
             "mainClass": "poop.SVGReader",

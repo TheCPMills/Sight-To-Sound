@@ -4,6 +4,7 @@ import java.util.*;
 import java.util.regex.*;
 import javax.vecmath.*;
 import util.Date;
+import util.SVGReader;
 
 // JavaFX packages
 import com.jfoenix.controls.*;
